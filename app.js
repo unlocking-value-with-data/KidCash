@@ -1402,13 +1402,15 @@ window.handleAuth = async function() {
 window.handleGoogleSignIn = async function() {
   authBusy = true;
   authError = '';
-  render();
+  // Don't call render() before the popup — Safari blocks popups
+  // if DOM manipulation happens between the click and window.open()
   try {
     await fbSignInWithGoogle(firebaseAuth, firebaseGoogleProvider);
     // onAuthStateChanged will handle the rest
   } catch (e) {
     authBusy = false;
     authError = friendlyAuthError(e.code);
+    console.error('Google sign-in error:', e);
     render();
   }
 };
