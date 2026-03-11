@@ -1399,12 +1399,17 @@ window.handleAuth = async function() {
   }
 };
 
-window.handleGoogleSignIn = function() {
+window.handleGoogleSignIn = async function() {
   authBusy = true;
   authError = '';
-  // Use redirect instead of popup — more reliable across browsers/mobile
-  fbSignInWithGoogle(firebaseAuth, firebaseGoogleProvider);
-  // Page will redirect to Google, then back. initAuth() handles the result.
+  try {
+    await fbSignInWithGoogle(firebaseAuth, firebaseGoogleProvider);
+  } catch (e) {
+    authBusy = false;
+    authError = friendlyAuthError(e.code);
+    console.error('Google sign-in error:', e);
+    render();
+  }
 };
 
 window.handleSignOut = async function() {
@@ -1467,30 +1472,26 @@ document.head.appendChild(shakeStyle);
 // Show loading spinner immediately
 render();
 
-async function initAuth() {
-  // Check for Google redirect result (user returning from Google sign-in)
-  try {
-    await window.fbGetRedirectResult(firebaseAuth);
-  } catch (e) {
-    console.error('Redirect sign-in error:', e);
-    authError = friendlyAuthError(e.code);
-    authBusy = false;
-    appReady = true;
-    render();
-  }
-
+function initAuth() {
   fbOnAuthStateChanged(firebaseAuth, async (user) => {
-    if (user) {
-      currentUser = user;
-      authBusy = false;
-      appReady = false;
-      render(); // show spinner while loading data
-      await loadFromFirestore(user.uid);
-      appReady = true;
-      render();
-    } else {
-      currentUser = null;
-      authBusy = false;
+    try {
+      if (user) {
+        currentUser = user;
+        authBusy = false;
+        appReady = false;
+        render(); // show spinner while loading data
+        await loadFromFirestore(user.uid);
+        appReady = true;
+        render();
+      } else {
+        currentUser = null;
+        authBusy = false;
+        appReady = true;
+        render();
+      }
+    } catch (e) {
+      console.error('Auth state handler error:', e);
+      // Still show the app even if Firestore fails
       appReady = true;
       render();
     }
