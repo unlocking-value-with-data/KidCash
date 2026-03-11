@@ -1133,7 +1133,7 @@ function bindEvents() {
       if (el) el.focus();
     }, 100);
   }
-  if (modalOpen === 'transaction' && pendingWishlistPurchase) {
+  if (modalOpen === 'transaction' && pendingWishlistPurchase && txType === 'expense') {
     setTimeout(() => {
       const amtEl = document.getElementById('txAmount');
       const descEl = document.getElementById('txDescription');
@@ -1146,6 +1146,7 @@ function bindEvents() {
 
 window.switchKid = function(index) {
   state.activeKidIndex = index;
+  pendingWishlistPurchase = null;
   saveData(state);
   render();
 };
@@ -1163,6 +1164,7 @@ window.openModal = function(type) {
 
 window.closeModal = function() {
   modalOpen = null;
+  pendingWishlistPurchase = null;
   render();
 };
 
