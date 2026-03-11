@@ -685,6 +685,7 @@ function renderGoalsSnapshot(goals, balance) {
 function renderGoalCardCompact(goal, balance) {
   const percent = goal.target > 0 ? Math.min(100, Math.round((balance / goal.target) * 100)) : 0;
   const isComplete = percent >= 100;
+  const remaining = balance - goal.target;
   return `
     <div class="goal-card compact">
       <div class="goal-top">
@@ -695,6 +696,9 @@ function renderGoalCardCompact(goal, balance) {
         <div class="goal-progress-fill ${isComplete ? 'complete' : ''}" style="width: ${percent}%"></div>
       </div>
       <div class="goal-percent">${isComplete ? '🎉 Goal reached!' : `${percent}% saved`}</div>
+      <div class="goal-balance-after ${remaining < 0 ? 'negative' : ''}">
+        ${isComplete ? `${formatMoney(remaining)} left after buying` : `Need ${formatMoney(Math.abs(remaining))} more`}
+      </div>
     </div>
   `;
 }
@@ -813,7 +817,7 @@ function renderGoalsPage() {
       </div>
       ${wishlist.length > 0 ? `
         <div class="wishlist-list">
-          ${wishlist.map(w => renderWishlistCard(w)).join('')}
+          ${wishlist.map(w => renderWishlistCard(w, balance)).join('')}
         </div>
       ` : `
         <div class="empty-state">
@@ -875,6 +879,7 @@ function renderSettingsPage() {
 function renderGoalCard(goal, balance) {
   const percent = goal.target > 0 ? Math.min(100, Math.round((balance / goal.target) * 100)) : 0;
   const isComplete = percent >= 100;
+  const remaining = balance - goal.target;
   return `
     <div class="goal-card">
       <div class="goal-top">
@@ -885,6 +890,9 @@ function renderGoalCard(goal, balance) {
         <div class="goal-progress-fill ${isComplete ? 'complete' : ''}" style="width: ${percent}%"></div>
       </div>
       <div class="goal-percent">${isComplete ? '🎉 Goal reached!' : `${percent}% saved`}</div>
+      <div class="goal-balance-after ${remaining < 0 ? 'negative' : ''}">
+        ${isComplete ? `${formatMoney(remaining)} left after buying` : `Need ${formatMoney(Math.abs(remaining))} more`}
+      </div>
       <div class="goal-actions">
         <button class="goal-action-btn delete" onclick="confirmDeleteGoal('${sanitizeId(goal.id)}')">Remove</button>
       </div>
@@ -908,8 +916,9 @@ function renderTransaction(t) {
   `;
 }
 
-function renderWishlistCard(item) {
+function renderWishlistCard(item, balance) {
   const hasImage = item.image;
+  const remaining = (balance != null) ? balance - item.price : null;
   return `
     <div class="wishlist-card">
       <div class="wishlist-top">
@@ -917,6 +926,7 @@ function renderWishlistCard(item) {
         <div class="wishlist-info">
           <div class="wishlist-name">${escapeHtml(item.name)}</div>
           <div class="wishlist-price">${formatMoney(item.price)}</div>
+          ${remaining != null ? `<div class="wishlist-balance-after ${remaining < 0 ? 'negative' : ''}">${remaining >= 0 ? `${formatMoney(remaining)} left after` : `Need ${formatMoney(Math.abs(remaining))} more`}</div>` : ''}
           <a class="wishlist-link" href="${sanitizeUrl(item.url)}" target="_blank" rel="noopener">View product ↗</a>
         </div>
       </div>
@@ -968,6 +978,9 @@ function renderTransactionModal() {
             <div class="tax-row"><span>Subtotal</span><span id="taxSubtotal">$0.00</span></div>
             <div class="tax-row"><span>Tax (<span id="taxRateLabel">0%</span>)</span><span id="taxAmount">$0.00</span></div>
             <div class="tax-row tax-total"><span>Total</span><span id="taxTotal">$0.00</span></div>
+          </div>
+          <div id="balanceAfterPreview" class="balance-after-preview" style="display:none">
+            <span>Balance after purchase</span><span id="balanceAfter" class="balance-after-amount">$0.00</span>
           </div>
         ` : ''}
         <div class="form-group">
@@ -1135,20 +1148,38 @@ window.updateTaxPreview = function() {
   const amountStr = document.getElementById('txAmount')?.value;
   const stateCode = document.getElementById('txState')?.value || '';
   const preview = document.getElementById('taxPreview');
+  const balPreview = document.getElementById('balanceAfterPreview');
   if (!preview) return;
   const amountCents = parseMoney(amountStr);
   const info = STATE_TAX_RATES[stateCode];
+
+  // Show/hide tax breakdown
   if (!amountCents || !stateCode || !info || info.rate === 0) {
     preview.style.display = 'none';
-    return;
+  } else {
+    const taxCents = calcTax(amountCents, stateCode);
+    const totalCents = amountCents + taxCents;
+    document.getElementById('taxSubtotal').textContent = formatMoney(amountCents);
+    document.getElementById('taxRateLabel').textContent = info.rate + '%';
+    document.getElementById('taxAmount').textContent = formatMoney(taxCents);
+    document.getElementById('taxTotal').textContent = formatMoney(totalCents);
+    preview.style.display = 'block';
   }
-  const taxCents = calcTax(amountCents, stateCode);
-  const totalCents = amountCents + taxCents;
-  document.getElementById('taxSubtotal').textContent = formatMoney(amountCents);
-  document.getElementById('taxRateLabel').textContent = info.rate + '%';
-  document.getElementById('taxAmount').textContent = formatMoney(taxCents);
-  document.getElementById('taxTotal').textContent = formatMoney(totalCents);
-  preview.style.display = 'block';
+
+  // Always show balance-after when there's an amount
+  if (balPreview && amountCents) {
+    const kid = getActiveKid();
+    const balance = kid ? getBalance(kid.id) : 0;
+    const taxCents = (stateCode && info && info.rate > 0) ? calcTax(amountCents, stateCode) : 0;
+    const totalSpend = amountCents + taxCents;
+    const remaining = balance - totalSpend;
+    const balEl = document.getElementById('balanceAfter');
+    balEl.textContent = formatMoney(remaining);
+    balEl.className = 'balance-after-amount' + (remaining < 0 ? ' negative' : '');
+    balPreview.style.display = 'flex';
+  } else if (balPreview) {
+    balPreview.style.display = 'none';
+  }
 };
 
 window.submitTransaction = function() {
