@@ -1399,20 +1399,12 @@ window.handleAuth = async function() {
   }
 };
 
-window.handleGoogleSignIn = async function() {
+window.handleGoogleSignIn = function() {
   authBusy = true;
   authError = '';
-  // Don't call render() before the popup — Safari blocks popups
-  // if DOM manipulation happens between the click and window.open()
-  try {
-    await fbSignInWithGoogle(firebaseAuth, firebaseGoogleProvider);
-    // onAuthStateChanged will handle the rest
-  } catch (e) {
-    authBusy = false;
-    authError = friendlyAuthError(e.code);
-    console.error('Google sign-in error:', e);
-    render();
-  }
+  // Use redirect instead of popup — more reliable across browsers/mobile
+  fbSignInWithGoogle(firebaseAuth, firebaseGoogleProvider);
+  // Page will redirect to Google, then back. initAuth() handles the result.
 };
 
 window.handleSignOut = async function() {
@@ -1475,7 +1467,18 @@ document.head.appendChild(shakeStyle);
 // Show loading spinner immediately
 render();
 
-function initAuth() {
+async function initAuth() {
+  // Check for Google redirect result (user returning from Google sign-in)
+  try {
+    await window.fbGetRedirectResult(firebaseAuth);
+  } catch (e) {
+    console.error('Redirect sign-in error:', e);
+    authError = friendlyAuthError(e.code);
+    authBusy = false;
+    appReady = true;
+    render();
+  }
+
   fbOnAuthStateChanged(firebaseAuth, async (user) => {
     if (user) {
       currentUser = user;
