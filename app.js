@@ -29,12 +29,15 @@ function loadData() {
 }
 
 function saveData(data) {
+  data.updatedAt = Date.now();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   // Sync to Firestore if signed in
   if (currentUser && window.fbSetDoc) {
     saveToFirestore(currentUser.uid, data);
   }
 }
+
+let syncStatus = 'ok'; // 'ok' | 'error'
 
 async function saveToFirestore(uid, data) {
   try {
@@ -45,10 +48,18 @@ async function saveToFirestore(uid, data) {
       goals: data.goals || [],
       wishlist: data.wishlist || [],
       activeKidIndex: data.activeKidIndex || 0,
-      updatedAt: Date.now(),
+      updatedAt: data.updatedAt || Date.now(),
     });
+    if (syncStatus !== 'ok') {
+      syncStatus = 'ok';
+      render();
+    }
   } catch (e) {
     console.error('Failed to save to Firestore:', e);
+    if (syncStatus !== 'error') {
+      syncStatus = 'error';
+      render();
+    }
   }
 }
 
@@ -56,15 +67,34 @@ async function loadFromFirestore(uid) {
   try {
     const docRef = fbDoc(firebaseDb, 'users', uid);
     const docSnap = await fbGetDoc(docRef);
+    const localData = loadData();
+    const localTime = localData.updatedAt || 0;
+
     if (docSnap.exists()) {
-      const data = docSnap.data();
-      if (!data.goals) data.goals = [];
-      if (!data.wishlist) data.wishlist = [];
-      state = data;
+      const cloudData = docSnap.data();
+      const cloudTime = cloudData.updatedAt || 0;
+      if (!cloudData.goals) cloudData.goals = [];
+      if (!cloudData.wishlist) cloudData.wishlist = [];
+
+      if (localTime > cloudTime && localData.transactions?.length > 0) {
+        // Local data is newer — use it and push to Firestore
+        console.log('Local data is newer, syncing to cloud');
+        state = localData;
+        await saveToFirestore(uid, state);
+      } else {
+        // Cloud data is newer or same — use it
+        state = cloudData;
+      }
+    } else if (localData.transactions?.length > 0) {
+      // No cloud data but local data exists — push it up
+      console.log('No cloud data found, pushing local data');
+      state = localData;
+      await saveToFirestore(uid, state);
     } else {
-      // New user — initialize with defaults
+      // New user, no data anywhere — initialize with defaults
       state = getDefaultData();
       state.wishlist = [];
+      state.updatedAt = Date.now();
       await saveToFirestore(uid, state);
     }
     // Cache locally
@@ -579,9 +609,13 @@ function renderHeader() {
     goals: 'Goals & Wishlist',
     settings: 'Settings',
   };
+  const syncIndicator = syncStatus === 'error'
+    ? '<span class="sync-error" title="Changes saved locally but not syncing to cloud">⚠️ Offline</span>'
+    : '';
   return `
     <div class="header">
       <h1>${titles[currentView] || 'KidCash'}</h1>
+      ${syncIndicator}
     </div>
   `;
 }
