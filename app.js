@@ -92,8 +92,9 @@ let fetchedProduct = { name: '', price: '', image: null };
 // ─── Auth State ──────────────────────────────────────────────
 let currentUser = null;
 let appReady = false;
-let authMode = 'login'; // 'login' | 'signup'
+let authMode = 'login'; // 'login' | 'signup' | 'reset'
 let authError = '';
+let authMessage = '';
 let authBusy = false;
 
 function getActiveKid() {
@@ -504,9 +505,37 @@ function render() {
 // ─── Login Screen ─────────────────────────────────────────────
 function renderLoginScreen() {
   const isSignup = authMode === 'signup';
+  const isReset = authMode === 'reset';
   const errorHtml = authError
     ? `<div class="auth-error">${escapeHtml(authError)}</div>`
     : '';
+  const messageHtml = authMessage
+    ? `<div class="auth-message">${escapeHtml(authMessage)}</div>`
+    : '';
+
+  if (isReset) {
+    return `
+      <div class="login-screen">
+        <div class="login-card">
+          <div class="login-logo">
+            <h1>💰 KidCash</h1>
+            <p>Reset Your Password</p>
+          </div>
+          <div class="login-form">
+            ${errorHtml}
+            ${messageHtml}
+            <input class="login-input" type="email" id="authEmail" placeholder="Email address" autocomplete="email" autocapitalize="off">
+            <button class="login-btn" onclick="handleForgotPassword()" ${authBusy ? 'disabled' : ''}>
+              ${authBusy ? 'Please wait...' : 'Send Reset Link'}
+            </button>
+            <div class="login-toggle">
+              <button onclick="setAuthMode('login')">Back to Sign In</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
 
   return `
     <div class="login-screen">
@@ -517,12 +546,14 @@ function renderLoginScreen() {
         </div>
         <div class="login-form">
           ${errorHtml}
+          ${messageHtml}
           <input class="login-input" type="email" id="authEmail" placeholder="Email address" autocomplete="email" autocapitalize="off">
           <input class="login-input" type="password" id="authPassword" placeholder="Password" autocomplete="${isSignup ? 'new-password' : 'current-password'}">
           ${isSignup ? '<input class="login-input" type="password" id="authPasswordConfirm" placeholder="Confirm password" autocomplete="new-password">' : ''}
           <button class="login-btn" onclick="handleAuth()" ${authBusy ? 'disabled' : ''}>
             ${authBusy ? 'Please wait...' : (isSignup ? 'Create Account' : 'Sign In')}
           </button>
+          ${!isSignup ? '<div class="forgot-password"><button onclick="setAuthMode(\'reset\')">Forgot password?</button></div>' : ''}
           <div class="login-divider">or</div>
           <button class="google-btn" onclick="handleGoogleSignIn()" ${authBusy ? 'disabled' : ''}>
             <svg viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
@@ -832,6 +863,9 @@ function renderSettingsPage() {
     <div class="settings-section">
       <label class="settings-section-label">Account</label>
       <p class="settings-user-email">Signed in as ${escapeHtml(currentUser?.email || 'Unknown')}</p>
+      ${currentUser?.email && !currentUser?.emailVerified && currentUser?.providerData?.[0]?.providerId === 'password'
+        ? '<div class="email-verify-warning">⚠️ Email not verified. <button onclick="handleResendVerification()">Resend verification email</button></div>'
+        : ''}
       <button class="signout-btn" onclick="handleSignOut()">Sign Out</button>
     </div>
   `;
@@ -1349,6 +1383,14 @@ window.submitTransaction = function() {
 window.toggleAuthMode = function() {
   authMode = authMode === 'login' ? 'signup' : 'login';
   authError = '';
+  authMessage = '';
+  render();
+};
+
+window.setAuthMode = function(mode) {
+  authMode = mode;
+  authError = '';
+  authMessage = '';
   render();
 };
 
@@ -1362,6 +1404,7 @@ function friendlyAuthError(code) {
     case 'auth/too-many-requests': return 'Too many attempts. Please try again later.';
     case 'auth/invalid-credential': return 'Invalid email or password.';
     case 'auth/popup-closed-by-user': return 'Sign-in popup was closed.';
+    case 'auth/missing-email': return 'Please enter your email address.';
     default: return 'Something went wrong. Please try again.';
   }
 }
@@ -1387,7 +1430,9 @@ window.handleAuth = async function() {
   render();
   try {
     if (authMode === 'signup') {
-      await fbCreateAccount(firebaseAuth, email, password);
+      const result = await fbCreateAccount(firebaseAuth, email, password);
+      // Send verification email to new user
+      try { await fbSendEmailVerification(result.user); } catch (ev) { console.warn('Verification email failed:', ev); }
     } else {
       await fbSignInWithEmail(firebaseAuth, email, password);
     }
@@ -1409,6 +1454,43 @@ window.handleGoogleSignIn = async function() {
     authError = friendlyAuthError(e.code);
     console.error('Google sign-in error:', e);
     render();
+  }
+};
+
+window.handleForgotPassword = async function() {
+  const email = document.getElementById('authEmail')?.value?.trim();
+  if (!email) {
+    authError = 'Please enter your email address.';
+    authMessage = '';
+    render();
+    return;
+  }
+  authBusy = true;
+  authError = '';
+  authMessage = '';
+  render();
+  try {
+    await fbSendPasswordResetEmail(firebaseAuth, email);
+    authBusy = false;
+    authMessage = 'Check your email for a password reset link.';
+    authError = '';
+    render();
+  } catch (e) {
+    authBusy = false;
+    authError = friendlyAuthError(e.code);
+    authMessage = '';
+    render();
+  }
+};
+
+window.handleResendVerification = async function() {
+  if (!currentUser) return;
+  try {
+    await fbSendEmailVerification(currentUser);
+    alert('Verification email sent! Check your inbox.');
+  } catch (e) {
+    alert('Could not send verification email. Try again later.');
+    console.error('Resend verification failed:', e);
   }
 };
 

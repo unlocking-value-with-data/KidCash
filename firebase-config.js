@@ -24,7 +24,7 @@
 // ───────────────────────────────────────────────────────────────
 
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js';
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut }
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut, sendEmailVerification, sendPasswordResetEmail }
   from 'https://www.gstatic.com/firebasejs/11.4.0/firebase-auth.js';
 import { getFirestore, doc, getDoc, setDoc }
   from 'https://www.gstatic.com/firebasejs/11.4.0/firebase-firestore.js';
@@ -52,6 +52,8 @@ window.fbSignInWithEmail = signInWithEmailAndPassword;
 window.fbCreateAccount = createUserWithEmailAndPassword;
 window.fbSignInWithGoogle = signInWithPopup;
 window.fbSignOut = signOut;
+window.fbSendEmailVerification = sendEmailVerification;
+window.fbSendPasswordResetEmail = sendPasswordResetEmail;
 window.fbDoc = doc;
 window.fbGetDoc = getDoc;
 window.fbSetDoc = setDoc;

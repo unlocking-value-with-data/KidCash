@@ -1187,6 +1187,51 @@ body {
   animation: slideIn 0.2s ease;
 }
 
+.auth-message {
+  background: rgba(0, 184, 148, 0.1);
+  color: var(--green);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 12px;
+  text-align: center;
+  animation: slideIn 0.2s ease;
+}
+
+.forgot-password {
+  text-align: right;
+  margin: -4px 0 4px;
+}
+.forgot-password button {
+  background: none;
+  border: none;
+  color: var(--purple);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.email-verify-warning {
+  background: rgba(253, 203, 110, 0.15);
+  color: #b8860b;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  margin-bottom: 12px;
+  text-align: center;
+}
+.email-verify-warning button {
+  background: none;
+  border: none;
+  color: var(--purple);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
 /* ─── Settings Sign Out ──────────────────────────────────────── */
 .signout-btn {
   width: 100%;
