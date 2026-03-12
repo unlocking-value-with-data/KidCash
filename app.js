@@ -31,37 +31,87 @@ function loadData() {
 function saveData(data) {
   data.updatedAt = Date.now();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  // Sync to Firestore if signed in
-  if (currentUser && window.fbSetDoc) {
-    saveToFirestore(currentUser.uid, data);
-  }
+  scheduleSyncToFirestore();
 }
 
+// ─── Sync Engine ─────────────────────────────────────────────
+// Debounced (1.5s), serialized (one write at a time), auto-retry on failure
 let syncStatus = 'ok'; // 'ok' | 'error'
+let _syncTimer = null;
+let _syncInProgress = false;
+let _syncQueued = false;
 
-async function saveToFirestore(uid, data) {
+// Direct write — used by loadFromFirestore for initial sync
+async function writeToFirestore(uid, data) {
+  const docRef = fbDoc(firebaseDb, 'users', uid);
+  await fbSetDoc(docRef, {
+    kids: data.kids || [],
+    transactions: data.transactions || [],
+    goals: data.goals || [],
+    wishlist: data.wishlist || [],
+    activeKidIndex: data.activeKidIndex || 0,
+    updatedAt: data.updatedAt || Date.now(),
+  });
+}
+
+// Schedule a debounced sync (waits 1.5s after last change)
+function scheduleSyncToFirestore() {
+  if (!currentUser || !window.fbSetDoc) return;
+  clearTimeout(_syncTimer);
+  _syncTimer = setTimeout(flushToFirestore, 1500);
+}
+
+// Flush latest localStorage data to Firestore
+async function flushToFirestore() {
+  if (!currentUser || !window.fbSetDoc) return;
+  clearTimeout(_syncTimer);
+
+  // If a write is already in progress, queue another one for when it finishes
+  if (_syncInProgress) {
+    _syncQueued = true;
+    return;
+  }
+
+  _syncInProgress = true;
   try {
-    const docRef = fbDoc(firebaseDb, 'users', uid);
-    await fbSetDoc(docRef, {
-      kids: data.kids || [],
-      transactions: data.transactions || [],
-      goals: data.goals || [],
-      wishlist: data.wishlist || [],
-      activeKidIndex: data.activeKidIndex || 0,
-      updatedAt: data.updatedAt || Date.now(),
-    });
+    const data = loadData(); // Always read the latest from localStorage
+    await writeToFirestore(currentUser.uid, data);
     if (syncStatus !== 'ok') {
       syncStatus = 'ok';
       render();
     }
   } catch (e) {
-    console.error('Failed to save to Firestore:', e);
+    console.error('Firestore sync failed:', e);
     if (syncStatus !== 'error') {
       syncStatus = 'error';
       render();
     }
+    // Auto-retry in 10 seconds
+    _syncTimer = setTimeout(flushToFirestore, 10000);
+  } finally {
+    _syncInProgress = false;
+    if (_syncQueued) {
+      _syncQueued = false;
+      // Process the queued write after a short delay
+      setTimeout(flushToFirestore, 500);
+    }
   }
 }
+
+// Sync when app comes back to foreground (catches missed saves)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && currentUser && window.fbSetDoc) {
+    flushToFirestore();
+  }
+});
+
+// Best-effort flush before page closes (data is safe in localStorage regardless)
+window.addEventListener('pagehide', () => {
+  if (currentUser && _syncTimer) {
+    clearTimeout(_syncTimer);
+    flushToFirestore();
+  }
+});
 
 async function loadFromFirestore(uid) {
   try {
@@ -80,7 +130,7 @@ async function loadFromFirestore(uid) {
         // Local data is newer — use it and push to Firestore
         console.log('Local data is newer, syncing to cloud');
         state = localData;
-        await saveToFirestore(uid, state);
+        await writeToFirestore(uid, state);
       } else {
         // Cloud data is newer or same — use it
         state = cloudData;
@@ -89,13 +139,13 @@ async function loadFromFirestore(uid) {
       // No cloud data but local data exists — push it up
       console.log('No cloud data found, pushing local data');
       state = localData;
-      await saveToFirestore(uid, state);
+      await writeToFirestore(uid, state);
     } else {
       // New user, no data anywhere — initialize with defaults
       state = getDefaultData();
       state.wishlist = [];
       state.updatedAt = Date.now();
-      await saveToFirestore(uid, state);
+      await writeToFirestore(uid, state);
     }
     // Cache locally
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
