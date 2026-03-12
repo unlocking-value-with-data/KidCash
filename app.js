@@ -1151,12 +1151,13 @@ function renderGoalCard(goal, balance) {
 function renderTransaction(t) {
   const icon = getCategoryIcon(t.type, t.category);
   const taxInfo = t.tax ? `<span class="tx-tax">incl. ${formatMoney(t.tax)} tax (${escapeHtml(t.taxState || '')})</span>` : '';
+  const createdByBadge = t.createdBy ? `<span class="tx-created-by tx-created-by--${t.createdBy}">${t.createdBy === 'kid' ? '👧 Kid' : '👤 Parent'}</span>` : '';
   return `
     <div class="transaction-item">
       <div class="tx-icon ${t.type}">${icon}</div>
       <div class="tx-details">
         <div class="tx-description">${escapeHtml(t.description)}</div>
-        <div class="tx-date">${formatDate(t.timestamp)}${taxInfo}</div>
+        <div class="tx-date">${formatDate(t.timestamp)}${taxInfo}${createdByBadge}</div>
       </div>
       <div class="tx-amount ${t.type}">${t.type === 'income' ? '+' : '-'}${formatMoney(t.amount)}</div>
       ${isInKidMode() ? '' : `<button class="tx-delete" onclick="confirmDeleteTransaction('${sanitizeId(t.id)}')" title="Delete">✕</button>`}
@@ -1492,6 +1493,7 @@ window.submitTransaction = function() {
     description: description || (txType === 'income' ? 'Added money' : 'Purchase'),
     category,
     timestamp: Date.now(),
+    createdBy: isInKidMode() ? 'kid' : 'parent',
   });
   saveData(state);
   modalOpen = null;
