@@ -1078,11 +1078,16 @@ function renderSettingsPage() {
       </p>
       <div class="form-group" style="margin-bottom:12px">
         <label>Parent PIN (to unlock full access)</label>
-        <input type="text" class="settings-pin-input parent-pin" value="${state.parentPin || ''}"
-               maxlength="4" inputmode="numeric" pattern="[0-9]*"
-               placeholder="4-digit PIN"
-               onchange="setParentPin(this.value)"
-               onfocus="this.select()">
+        <div class="pin-input-wrapper">
+          <input type="password" id="parentPinInput" class="settings-pin-input parent-pin" value="${state.parentPin || ''}"
+                 maxlength="4" inputmode="numeric" pattern="[0-9]*"
+                 placeholder="4-digit PIN"
+                 onchange="setParentPin(this.value)"
+                 onfocus="this.select()">
+          <button type="button" class="pin-toggle-vis" onclick="toggleParentPinVisibility()" title="Show/hide PIN">
+            <svg id="pinEyeIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+          </button>
+        </div>
       </div>
       <div class="settings-toggle-row">
         <span>Enable Kid Mode</span>
@@ -1788,6 +1793,21 @@ window.setKidPin = function(index, value) {
   state.kids[index].pin = cleaned.length === 4 ? cleaned : undefined;
   saveData(state);
   render();
+};
+
+window.toggleParentPinVisibility = function() {
+  const input = document.getElementById('parentPinInput');
+  const icon = document.getElementById('pinEyeIcon');
+  if (!input) return;
+  if (input.type === 'password') {
+    input.type = 'text';
+    // Swap to eye-off icon
+    icon.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>';
+  } else {
+    input.type = 'password';
+    // Swap to eye icon
+    icon.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>';
+  }
 };
 
 window.setParentPin = function(value) {

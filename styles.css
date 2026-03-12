@@ -1515,6 +1515,33 @@ body {
   font-size: 18px;
 }
 
+.pin-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pin-toggle-vis {
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: none;
+  color: var(--text-light);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  transition: all 0.15s;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.pin-toggle-vis:active {
+  background: var(--bg);
+  color: var(--purple);
+}
+
 /* ─── Toggle Switch ──────────────────────────────────────────── */
 .settings-toggle-row {
   display: flex;
