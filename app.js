@@ -44,14 +44,16 @@ let _syncQueued = false;
 // Direct write — used by loadFromFirestore for initial sync
 async function writeToFirestore(uid, data) {
   const docRef = fbDoc(firebaseDb, 'users', uid);
-  await fbSetDoc(docRef, {
+  const payload = {
     kids: data.kids || [],
     transactions: data.transactions || [],
     goals: data.goals || [],
     wishlist: data.wishlist || [],
     activeKidIndex: data.activeKidIndex || 0,
     updatedAt: data.updatedAt || Date.now(),
-  });
+  };
+  if (data.parentPin) payload.parentPin = data.parentPin;
+  await fbSetDoc(docRef, payload);
 }
 
 // Schedule a debounced sync (waits 1.5s after last change)
@@ -177,7 +179,25 @@ let authError = '';
 let authMessage = '';
 let authBusy = false;
 
+// ─── Kid Mode State ─────────────────────────────────────────
+let kidModeEnabled = localStorage.getItem('kidcash_kidmode') === 'true';
+let kidModeLocked = kidModeEnabled; // start locked if enabled
+let kidModeKidIndex = null;         // which kid is authenticated
+let kidModePinEntry = '';           // PIN being typed
+let kidModePinError = '';           // error on PIN screen
+let kidModeSelectedKid = null;      // kid tapped on selection screen
+let showParentUnlockModal = false;
+let parentUnlockError = '';
+let parentUnlockBusy = false;
+
+function isInKidMode() {
+  return kidModeEnabled && !kidModeLocked && kidModeKidIndex !== null;
+}
+
 function getActiveKid() {
+  if (isInKidMode()) {
+    return state.kids[kidModeKidIndex] || state.kids[0];
+  }
   return state.kids[state.activeKidIndex] || state.kids[0];
 }
 
@@ -559,8 +579,18 @@ function render() {
     return;
   }
 
+  // Kid Mode: show PIN lock screen
+  if (kidModeEnabled && kidModeLocked) {
+    app.innerHTML = renderPinLockScreen();
+    return;
+  }
+
+  const kidMode = isInKidMode();
+  // In kid mode, block settings access
+  const effectiveView = (kidMode && currentView === 'settings') ? 'home' : currentView;
+
   let pageContent = '';
-  switch (currentView) {
+  switch (effectiveView) {
     case 'home':     pageContent = renderHomePage(); break;
     case 'activity': pageContent = renderActivityPage(); break;
     case 'goals':    pageContent = renderGoalsPage(); break;
@@ -571,14 +601,15 @@ function render() {
   app.innerHTML = `
     <div class="page-content">
       ${renderHeader()}
-      ${currentView !== 'settings' ? renderKidTabs() : ''}
+      ${(!kidMode && effectiveView !== 'settings') ? renderKidTabs() : ''}
       ${pageContent}
     </div>
-    ${renderBottomNav()}
+    ${kidMode ? renderKidModeBottomNav() : renderBottomNav()}
   `;
 
   app.innerHTML += renderModal();
   app.innerHTML += renderConfirm();
+  if (kidMode) app.innerHTML += renderParentUnlockModal();
   bindEvents();
 }
 
@@ -651,6 +682,76 @@ function renderLoginScreen() {
   `;
 }
 
+// ─── PIN Lock Screen ─────────────────────────────────────────
+function renderPinLockScreen() {
+  const kidsWithPins = state.kids
+    .map((kid, i) => ({ ...kid, index: i }))
+    .filter(kid => kid.pin && kid.pin.length === 4);
+
+  if (kidsWithPins.length === 0) {
+    // No kids have PINs — auto-disable Kid Mode
+    kidModeEnabled = false;
+    localStorage.setItem('kidcash_kidmode', 'false');
+    kidModeLocked = false;
+    render();
+    return '<div class="auth-loading"><div class="auth-spinner"></div></div>';
+  }
+
+  if (kidModeSelectedKid === null) {
+    // Phase 1: kid selection
+    return `
+      <div class="pin-lock-screen">
+        <div class="pin-lock-card">
+          <div class="pin-lock-logo">
+            <h1>💰 KidCash</h1>
+            <p>Who's using the app?</p>
+          </div>
+          <div class="pin-kid-buttons">
+            ${kidsWithPins.map(kid => `
+              <button class="pin-kid-btn" onclick="selectKidForPin(${kid.index})">
+                <span class="pin-kid-avatar">${kid.name.charAt(0).toUpperCase()}</span>
+                <span class="pin-kid-name">${escapeHtml(kid.name)}</span>
+              </button>
+            `).join('')}
+          </div>
+          <button class="pin-parent-btn" onclick="showParentUnlockFn()">🔒 Parent Mode</button>
+        </div>
+      </div>
+      ${renderParentUnlockModal()}
+    `;
+  }
+
+  // Phase 2: PIN entry
+  const kid = state.kids[kidModeSelectedKid];
+  const dots = Array.from({ length: 4 }, (_, i) =>
+    `<div class="pin-dot ${i < kidModePinEntry.length ? 'filled' : ''}"></div>`
+  ).join('');
+
+  return `
+    <div class="pin-lock-screen">
+      <div class="pin-lock-card">
+        <button class="pin-back-btn" onclick="clearPinSelection()">← Back</button>
+        <div class="pin-lock-logo">
+          <div class="pin-kid-avatar large">${kid.name.charAt(0).toUpperCase()}</div>
+          <p>${escapeHtml(kid.name)}</p>
+        </div>
+        <div class="pin-dots">${dots}</div>
+        ${kidModePinError ? `<div class="pin-error">${escapeHtml(kidModePinError)}</div>` : ''}
+        <div class="pin-keypad">
+          ${[1,2,3,4,5,6,7,8,9].map(n => `
+            <button class="pin-key" onclick="enterPinDigit('${n}')">${n}</button>
+          `).join('')}
+          <div class="pin-key-spacer"></div>
+          <button class="pin-key" onclick="enterPinDigit('0')">0</button>
+          <button class="pin-key" onclick="deletePinDigit()">⌫</button>
+        </div>
+        <button class="pin-parent-btn" onclick="showParentUnlockFn()">🔒 Parent Mode</button>
+      </div>
+    </div>
+    ${renderParentUnlockModal()}
+  `;
+}
+
 // ─── Shared Components ───────────────────────────────────────
 function renderHeader() {
   const titles = {
@@ -702,6 +803,37 @@ function renderBottomNav() {
   `;
 }
 
+function renderKidModeBottomNav() {
+  const tabs = [
+    { id: 'home',     icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>', label: 'Home' },
+    { id: 'activity', icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>', label: 'Activity' },
+    { id: 'goals',    icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>', label: 'Goals' },
+    { id: 'lock',     icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>', label: 'Lock' },
+  ];
+
+  return `
+    <nav class="bottom-nav">
+      ${tabs.map(tab => {
+        if (tab.id === 'lock') {
+          return `
+            <button class="bottom-nav-tab" onclick="lockKidMode()">
+              <span class="bottom-nav-icon">${tab.icon}</span>
+              <span class="bottom-nav-label">${tab.label}</span>
+            </button>
+          `;
+        }
+        return `
+          <button class="bottom-nav-tab ${currentView === tab.id ? 'active' : ''}"
+                  onclick="navigateTo('${tab.id}')">
+            <span class="bottom-nav-icon">${tab.icon}</span>
+            <span class="bottom-nav-label">${tab.label}</span>
+          </button>
+        `;
+      }).join('')}
+    </nav>
+  `;
+}
+
 // ─── Home Page ────────────────────────────────────────────────
 function renderHomePage() {
   const kid = getActiveKid();
@@ -744,7 +876,7 @@ function renderBalanceCard(kid, balance, income, expenses) {
 function renderQuickActions() {
   return `
     <div class="quick-actions">
-      <button class="action-btn add" onclick="openTransactionModal('income')">+ Add</button>
+      ${isInKidMode() ? '' : '<button class="action-btn add" onclick="openTransactionModal(\'income\')">+ Add</button>'}
       <button class="action-btn spend" onclick="openTransactionModal('expense')">- Spend</button>
       <button class="action-btn goal" onclick="navigateTo('goals')">🎯 Goals</button>
     </div>
@@ -848,7 +980,7 @@ function renderActivityPage() {
 
   return `
     <div class="page-actions">
-      <button class="action-btn add" onclick="openTransactionModal('income')">+ Add Money</button>
+      ${isInKidMode() ? '' : '<button class="action-btn add" onclick="openTransactionModal(\'income\')">+ Add Money</button>'}
       <button class="action-btn spend" onclick="openTransactionModal('expense')">- Spend</button>
     </div>
 
@@ -926,12 +1058,39 @@ function renderSettingsPage() {
       ${state.kids.map((kid, i) => `
         <div class="settings-kid">
           <input type="text" value="${escapeHtml(kid.name)}" onchange="renameKid(${i}, this.value)" placeholder="Name">
+          <input type="text" class="settings-pin-input" value="${kid.pin || ''}"
+                 maxlength="4" inputmode="numeric" pattern="[0-9]*"
+                 placeholder="PIN"
+                 onchange="setKidPin(${i}, this.value)"
+                 onfocus="this.select()">
           ${state.kids.length > 1 ? `
             <button class="remove-kid" onclick="confirmRemoveKid(${i})">✕</button>
           ` : ''}
         </div>
       `).join('')}
       <button class="add-kid-btn" onclick="addKid()">+ Add Another Kid</button>
+    </div>
+
+    <div class="settings-section">
+      <label class="settings-section-label">Kid Mode</label>
+      <p class="settings-about" style="margin-bottom:12px">
+        Lock the app so kids can only see their own data. Each kid needs a 4-digit PIN above.
+      </p>
+      <div class="form-group" style="margin-bottom:12px">
+        <label>Parent PIN (to unlock full access)</label>
+        <input type="text" class="settings-pin-input parent-pin" value="${state.parentPin || ''}"
+               maxlength="4" inputmode="numeric" pattern="[0-9]*"
+               placeholder="4-digit PIN"
+               onchange="setParentPin(this.value)"
+               onfocus="this.select()">
+      </div>
+      <div class="settings-toggle-row">
+        <span>Enable Kid Mode</span>
+        <button class="toggle-switch ${kidModeEnabled ? 'active' : ''}"
+                onclick="toggleKidMode()">
+          <span class="toggle-knob"></span>
+        </button>
+      </div>
     </div>
 
     <div class="settings-section">
@@ -995,7 +1154,7 @@ function renderTransaction(t) {
         <div class="tx-date">${formatDate(t.timestamp)}${taxInfo}</div>
       </div>
       <div class="tx-amount ${t.type}">${t.type === 'income' ? '+' : '-'}${formatMoney(t.amount)}</div>
-      <button class="tx-delete" onclick="confirmDeleteTransaction('${sanitizeId(t.id)}')" title="Delete">✕</button>
+      ${isInKidMode() ? '' : `<button class="tx-delete" onclick="confirmDeleteTransaction('${sanitizeId(t.id)}')" title="Delete">✕</button>`}
     </div>
   `;
 }
@@ -1043,10 +1202,10 @@ function renderTransactionModal() {
       <div class="modal">
         <div class="modal-handle"></div>
         <h2>${txType === 'income' ? 'Add Money' : 'Record Spending'}</h2>
-        <div class="type-toggle">
+        ${isInKidMode() ? '' : `<div class="type-toggle">
           <button class="${txType === 'income' ? 'active-income' : ''}" onclick="setTxType('income')">💵 Add Money</button>
           <button class="${txType === 'expense' ? 'active-expense' : ''}" onclick="setTxType('expense')">🛒 Spending</button>
-        </div>
+        </div>`}
         <div class="form-group">
           <label>${txType === 'expense' ? 'Price (before tax)' : 'Amount'}</label>
           <input type="number" id="txAmount" placeholder="0.00" step="0.01" min="0.01" inputmode="decimal" oninput="updateTaxPreview()">
@@ -1163,6 +1322,30 @@ function renderConfirm() {
   `;
 }
 
+function renderParentUnlockModal() {
+  if (!showParentUnlockModal) return '';
+  return `
+    <div class="confirm-overlay" onclick="cancelParentUnlock()">
+      <div class="confirm-box parent-unlock-box" onclick="event.stopPropagation()">
+        <h3 style="text-align:center; margin:0 0 16px 0; font-size:18px;">🔒 Parent Mode</h3>
+        ${parentUnlockError ? `<div class="auth-error" style="margin-bottom:12px">${escapeHtml(parentUnlockError)}</div>` : ''}
+        <div class="form-group" style="margin-bottom:16px">
+          <label>Parent PIN</label>
+          <input type="password" id="parentUnlockPin" placeholder="Enter 4-digit PIN"
+                 maxlength="4" inputmode="numeric" pattern="[0-9]*"
+                 class="login-input" style="margin-bottom:0; text-align:center; letter-spacing:8px; font-size:20px;" autocomplete="off">
+        </div>
+        <div style="display:flex; gap:10px;">
+          <button class="confirm-cancel" onclick="cancelParentUnlock()" style="flex:1; padding:12px; border-radius:12px; border:none; font-size:14px; font-weight:600; cursor:pointer; background:var(--bg); color:var(--text);">Cancel</button>
+          <button class="submit-btn" onclick="attemptParentUnlock()" style="flex:1; margin-top:0;" ${parentUnlockBusy ? 'disabled' : ''}>
+            ${parentUnlockBusy ? 'Checking...' : 'Unlock'}
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 // ─── Event Handlers ───────────────────────────────────────────
 function bindEvents() {
   if (modalOpen === 'transaction') {
@@ -1195,6 +1378,7 @@ function bindEvents() {
 }
 
 window.switchKid = function(index) {
+  if (isInKidMode()) return; // blocked in kid mode
   state.activeKidIndex = index;
   pendingWishlistPurchase = null;
   saveData(state);
@@ -1202,7 +1386,7 @@ window.switchKid = function(index) {
 };
 
 window.openTransactionModal = function(type) {
-  txType = type;
+  txType = isInKidMode() ? 'expense' : type; // kids can only record spending
   modalOpen = 'transaction';
   render();
 };
@@ -1496,6 +1680,150 @@ window.submitTransaction = function() {
   }
 };
 
+// ─── Kid Mode Handlers ───────────────────────────────────────
+window.selectKidForPin = function(index) {
+  kidModeSelectedKid = index;
+  kidModePinEntry = '';
+  kidModePinError = '';
+  render();
+};
+
+window.clearPinSelection = function() {
+  kidModeSelectedKid = null;
+  kidModePinEntry = '';
+  kidModePinError = '';
+  render();
+};
+
+window.enterPinDigit = function(digit) {
+  if (kidModePinEntry.length >= 4) return;
+  kidModePinEntry += digit;
+  kidModePinError = '';
+
+  if (kidModePinEntry.length === 4) {
+    const kid = state.kids[kidModeSelectedKid];
+    if (kid && kid.pin === kidModePinEntry) {
+      // Correct PIN — unlock for this kid
+      kidModeLocked = false;
+      kidModeKidIndex = kidModeSelectedKid;
+      state.activeKidIndex = kidModeSelectedKid;
+      currentView = 'home';
+      kidModePinEntry = '';
+      kidModePinError = '';
+      kidModeSelectedKid = null;
+    } else {
+      // Wrong PIN
+      kidModePinEntry = '';
+      kidModePinError = 'Wrong PIN. Try again.';
+    }
+  }
+  render();
+};
+
+window.deletePinDigit = function() {
+  kidModePinEntry = kidModePinEntry.slice(0, -1);
+  kidModePinError = '';
+  render();
+};
+
+window.lockKidMode = function() {
+  kidModeLocked = true;
+  kidModeKidIndex = null;
+  kidModeSelectedKid = null;
+  kidModePinEntry = '';
+  kidModePinError = '';
+  currentView = 'home';
+  render();
+};
+
+window.showParentUnlockFn = function() {
+  showParentUnlockModal = true;
+  parentUnlockError = '';
+  parentUnlockBusy = false;
+  render();
+  setTimeout(() => {
+    const el = document.getElementById('parentUnlockPin');
+    if (el) el.focus();
+  }, 100);
+};
+
+window.cancelParentUnlock = function() {
+  showParentUnlockModal = false;
+  parentUnlockError = '';
+  parentUnlockBusy = false;
+  render();
+};
+
+window.attemptParentUnlock = function() {
+  const pin = document.getElementById('parentUnlockPin')?.value;
+  if (!pin) {
+    parentUnlockError = 'Please enter the parent PIN.';
+    render();
+    return;
+  }
+  if (!state.parentPin) {
+    parentUnlockError = 'No parent PIN set. Sign out to reset.';
+    render();
+    return;
+  }
+  if (pin === state.parentPin) {
+    // Correct — exit Kid Mode entirely
+    showParentUnlockModal = false;
+    parentUnlockBusy = false;
+    parentUnlockError = '';
+    kidModeLocked = false;
+    kidModeKidIndex = null;
+    kidModeEnabled = false;
+    localStorage.setItem('kidcash_kidmode', 'false');
+    currentView = 'home';
+    render();
+  } else {
+    parentUnlockError = 'Incorrect PIN.';
+    render();
+  }
+};
+
+window.setKidPin = function(index, value) {
+  const cleaned = value.replace(/\D/g, '').slice(0, 4);
+  state.kids[index].pin = cleaned.length === 4 ? cleaned : undefined;
+  saveData(state);
+  render();
+};
+
+window.setParentPin = function(value) {
+  const cleaned = value.replace(/\D/g, '').slice(0, 4);
+  state.parentPin = cleaned.length === 4 ? cleaned : undefined;
+  saveData(state);
+  render();
+};
+
+window.toggleKidMode = function() {
+  if (!kidModeEnabled) {
+    // Enabling — validate requirements
+    const kidsWithPins = state.kids.filter(k => k.pin && k.pin.length === 4);
+    if (kidsWithPins.length === 0) {
+      alert('Set a 4-digit PIN for at least one kid before enabling Kid Mode.');
+      return;
+    }
+    if (!state.parentPin || state.parentPin.length !== 4) {
+      alert('Set a 4-digit Parent PIN before enabling Kid Mode.');
+      return;
+    }
+    kidModeEnabled = true;
+    localStorage.setItem('kidcash_kidmode', 'true');
+    kidModeLocked = true;
+    kidModeKidIndex = null;
+    currentView = 'home';
+  } else {
+    // Disabling
+    kidModeEnabled = false;
+    localStorage.setItem('kidcash_kidmode', 'false');
+    kidModeLocked = false;
+    kidModeKidIndex = null;
+  }
+  render();
+};
+
 // ─── Auth Handlers ───────────────────────────────────────────
 window.toggleAuthMode = function() {
   authMode = authMode === 'login' ? 'signup' : 'login';
@@ -1618,8 +1946,17 @@ window.handleSignOut = async function() {
     state = getDefaultData();
     state.wishlist = [];
     currentView = 'home';
+    // Clear kid mode state
+    kidModeEnabled = false;
+    kidModeLocked = false;
+    kidModeKidIndex = null;
+    kidModeSelectedKid = null;
+    kidModePinEntry = '';
+    kidModePinError = '';
+    showParentUnlockModal = false;
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem('kidcash_state');
+    localStorage.removeItem('kidcash_kidmode');
     render();
   } catch (e) {
     console.error('Sign out failed:', e);
@@ -1680,6 +2017,10 @@ function initAuth() {
         appReady = false;
         render(); // show spinner while loading data
         await loadFromFirestore(user.uid);
+        // Restore kid mode from localStorage after data loads
+        kidModeEnabled = localStorage.getItem('kidcash_kidmode') === 'true';
+        kidModeLocked = kidModeEnabled;
+        kidModeKidIndex = null;
         appReady = true;
         render();
       } else {
