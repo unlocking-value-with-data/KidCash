@@ -210,6 +210,7 @@ let modalOpen = null; // null | 'transaction' | 'goal' | 'wishlist' | 'recurring
 let txType = 'income';
 let recurringType = 'income';
 let choreRepeating = false;
+let chorePrefill = { name: '', amount: '' };
 let confirmAction = null;
 let pendingWishlistPurchase = null;
 let fetchStatus = null;
@@ -635,7 +636,7 @@ function render() {
 
   const kidMode = isInKidMode();
   // In kid mode, block settings access
-  const effectiveView = (kidMode && currentView === 'settings') ? 'home' : currentView;
+  const effectiveView = (kidMode && (currentView === 'settings' || currentView === 'chores')) ? 'home' : currentView;
 
   let pageContent = '';
   switch (effectiveView) {
@@ -643,13 +644,14 @@ function render() {
     case 'activity': pageContent = renderActivityPage(); break;
     case 'goals':    pageContent = renderGoalsPage(); break;
     case 'settings': pageContent = renderSettingsPage(); break;
+    case 'chores':   pageContent = renderChoresPage(); break;
     default:         pageContent = renderHomePage(); break;
   }
 
   app.innerHTML = `
     <div class="page-content">
       ${renderHeader()}
-      ${(!kidMode && effectiveView !== 'settings') ? renderKidTabs() : ''}
+      ${(!kidMode && effectiveView !== 'settings' && effectiveView !== 'chores') ? renderKidTabs() : ''}
       ${pageContent}
     </div>
     ${kidMode ? renderKidModeBottomNav() : renderBottomNav()}
@@ -807,6 +809,7 @@ function renderHeader() {
     activity: 'Activity',
     goals: 'Goals & Wishlist',
     settings: 'Settings',
+    chores: 'Chores',
   };
   const syncIndicator = syncStatus === 'error'
     ? '<span class="sync-error" title="Changes saved locally but not syncing to cloud">⚠️ Offline</span>'
@@ -1167,6 +1170,84 @@ function renderGoalsPage() {
   `;
 }
 
+// ─── Chores Page ──────────────────────────────────────────────
+const SUGGESTED_CHORES = [
+  { name: 'Take out trash',      amount: 100 },
+  { name: 'Unload dishwasher',   amount: 75 },
+  { name: 'Wash dishes',         amount: 150 },
+  { name: 'Vacuum',              amount: 200 },
+  { name: 'Sweep / mop floor',   amount: 150 },
+  { name: 'Clean bedroom',       amount: 100 },
+  { name: 'Clean bathroom',      amount: 200 },
+  { name: 'Do laundry',          amount: 200 },
+  { name: 'Fold laundry',        amount: 100 },
+  { name: 'Set the table',       amount: 50 },
+  { name: 'Wipe counters',       amount: 75 },
+  { name: 'Feed pets',           amount: 50 },
+  { name: 'Walk the dog',        amount: 100 },
+  { name: 'Water plants',        amount: 50 },
+  { name: 'Rake leaves',         amount: 200 },
+  { name: 'Mow the lawn',        amount: 500 },
+  { name: 'Wash the car',        amount: 300 },
+  { name: 'Shovel snow',         amount: 500 },
+  { name: 'Take recycling out',  amount: 100 },
+  { name: 'Make bed',            amount: 50 },
+];
+
+function renderChoresPage() {
+  const chores = state.chores || [];
+  const active = chores.filter(c => c.status !== 'approved');
+  return `
+    <div class="page-back-btn-row">
+      <button class="page-back-btn" onclick="navigateTo('settings')">← Settings</button>
+    </div>
+
+    <div class="section">
+      <div class="section-header">
+        <h3 class="section-title">Active Chores</h3>
+        <button class="section-link" onclick="openModal('chore')">+ Add</button>
+      </div>
+      ${active.length === 0 ? `
+        <div class="empty-state">
+          <div class="empty-icon">🧹</div>
+          <p>No chores yet. Add one below or pick from suggestions.</p>
+        </div>
+      ` : `
+        <div class="chore-list">
+          ${active.map(c => {
+            const kid = state.kids.find(k => k.id === c.kidId);
+            const kidName = kid ? escapeHtml(kid.name) : 'Unknown';
+            const statusLabel = c.status === 'pending' ? '⏳ Awaiting approval' : '○ Available';
+            return `
+              <div class="chore-item">
+                <div class="chore-info">
+                  <div class="chore-name">${escapeHtml(c.name)}</div>
+                  <div class="chore-amount">${kidName} · +${formatMoney(c.amount)}${c.repeating ? ' · Repeating' : ''}</div>
+                  <div class="chore-amount" style="margin-top:2px">${statusLabel}</div>
+                </div>
+                <button class="tx-delete" onclick="confirmDeleteChore('${sanitizeId(c.id)}')">✕</button>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `}
+    </div>
+
+    <div class="section">
+      <div class="section-header">
+        <h3 class="section-title">Suggestions</h3>
+      </div>
+      <div class="chore-suggestions">
+        ${SUGGESTED_CHORES.map(s => `
+          <button class="chore-suggestion-chip" onclick="openChoreModalWithSuggestion('${escapeHtml(s.name)}', ${s.amount})">
+            ${escapeHtml(s.name)} <span class="chip-amount">+${formatMoney(s.amount)}</span>
+          </button>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
 // ─── Settings Page ────────────────────────────────────────────
 function renderSettingsPage() {
   const stateOptions = Object.entries(STATE_TAX_RATES).map(([code, info]) => {
@@ -1222,28 +1303,10 @@ function renderSettingsPage() {
 
     <div class="settings-section">
       <label class="settings-section-label">Chores</label>
-      ${(state.chores || []).length === 0
-        ? '<p class="settings-about" style="margin-bottom:12px">No chores set up yet. Add one below.</p>'
-        : (state.chores || []).map(c => {
-            const kid = state.kids.find(k => k.id === c.kidId);
-            const kidName = kid ? escapeHtml(kid.name) : 'Unknown';
-            const statusLabel = c.status === 'pending' ? '⏳ Pending' : c.status === 'approved' ? '✓ Done' : '○ Available';
-            return `
-              <div class="recurring-item">
-                <div class="recurring-icon income">🧹</div>
-                <div class="recurring-details">
-                  <div class="recurring-desc">${escapeHtml(c.name)}</div>
-                  <div class="recurring-meta">${kidName} · +${formatMoney(c.amount)}${c.repeating ? ' · Repeating' : ''}</div>
-                  <div class="recurring-next">${statusLabel}</div>
-                </div>
-                <div class="recurring-actions">
-                  <button class="remove-kid" onclick="confirmDeleteChore('${sanitizeId(c.id)}')">✕</button>
-                </div>
-              </div>
-            `;
-          }).join('')
-      }
-      <button class="add-kid-btn" onclick="openModal('chore')">+ Add Chore</button>
+      <button class="settings-nav-btn" onclick="navigateTo('chores')">
+        <span>Manage Chores</span>
+        <span class="settings-nav-count">${(state.chores || []).filter(c => c.status !== 'approved').length} active →</span>
+      </button>
     </div>
 
     <div class="settings-section">
@@ -1393,11 +1456,11 @@ function renderChoreModal() {
         </div>
         <div class="form-group">
           <label>Chore</label>
-          <input type="text" id="choreName" placeholder="e.g., Take out trash">
+          <input type="text" id="choreName" placeholder="e.g., Take out trash" value="${escapeHtml(chorePrefill.name)}">
         </div>
         <div class="form-group">
           <label>Payment</label>
-          <input type="number" id="choreAmount" placeholder="0.00" step="0.01" min="0.01" inputmode="decimal">
+          <input type="number" id="choreAmount" placeholder="0.00" step="0.01" min="0.01" inputmode="decimal" value="${chorePrefill.amount ? (chorePrefill.amount / 100).toFixed(2) : ''}">
         </div>
         <div class="settings-toggle-row" style="margin-bottom:16px">
           <span>Repeating (resets after approval)</span>
@@ -1673,7 +1736,7 @@ window.openTransactionModal = function(type) {
 window.openModal = function(type) {
   modalOpen = type;
   if (type === 'recurring') recurringType = 'income';
-  if (type === 'chore') choreRepeating = false;
+  if (type === 'chore') { choreRepeating = false; chorePrefill = { name: '', amount: '' }; }
   render();
 };
 
@@ -1789,6 +1852,13 @@ window.submitGoal = function() {
   });
   saveData(state);
   modalOpen = null;
+  render();
+};
+
+window.openChoreModalWithSuggestion = function(name, amount) {
+  choreRepeating = false;
+  chorePrefill = { name, amount };
+  modalOpen = 'chore';
   render();
 };
 

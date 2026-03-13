@@ -1704,6 +1704,70 @@ body {
   flex-shrink: 0;
 }
 
+/* ─── Settings Nav Button ────────────────────────────────────── */
+.settings-nav-btn {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  background: var(--bg-secondary);
+  border: none;
+  border-radius: 12px;
+  font-size: 15px;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+.settings-nav-count {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+/* ─── Back Button Row ─────────────────────────────────────────── */
+.page-back-btn-row {
+  padding: 4px 0 8px;
+}
+
+.page-back-btn {
+  background: none;
+  border: none;
+  font-size: 15px;
+  color: var(--purple);
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+/* ─── Chore Suggestions ──────────────────────────────────────── */
+.chore-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chore-suggestion-chip {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 6px 12px;
+  font-size: 14px;
+  cursor: pointer;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chore-suggestion-chip:active {
+  background: var(--border);
+}
+
+.chip-amount {
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 600;
+}
+
 /* ─── Chore Items ────────────────────────────────────────────── */
 .chore-list {
   display: flex;
