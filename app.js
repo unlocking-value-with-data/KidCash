@@ -936,6 +936,8 @@ function renderWishlistSnapshot(wishlist) {
 
 function renderWishlistCardCompact(item) {
   const hasImage = item.image;
+  const tax = calcTax(item.price, selectedState);
+  const taxLine = tax > 0 ? `<div class="wishlist-price-withtax">~${formatMoney(item.price + tax)} with tax</div>` : '';
   return `
     <div class="wishlist-card compact" onclick="navigateTo('goals')">
       <div class="wishlist-top">
@@ -943,6 +945,7 @@ function renderWishlistCardCompact(item) {
         <div class="wishlist-info">
           <div class="wishlist-name">${escapeHtml(item.name)}</div>
           <div class="wishlist-price">${formatMoney(item.price)}</div>
+          ${taxLine}
         </div>
       </div>
     </div>
@@ -1167,14 +1170,16 @@ function renderTransaction(t) {
 
 function renderWishlistCard(item, balance) {
   const hasImage = item.image;
-  const remaining = (balance != null) ? balance - item.price : null;
+  const tax = calcTax(item.price, selectedState);
+  const totalWithTax = item.price + tax;
+  const remaining = (balance != null) ? balance - totalWithTax : null;
   return `
     <div class="wishlist-card">
       <div class="wishlist-top">
         ${hasImage ? `<img class="wishlist-image" src="${escapeHtml(item.image)}" alt="" onerror="this.style.display='none'">` : ''}
         <div class="wishlist-info">
           <div class="wishlist-name">${escapeHtml(item.name)}</div>
-          <div class="wishlist-price">${formatMoney(item.price)}</div>
+          <div class="wishlist-price">${formatMoney(item.price)}${tax > 0 ? ` <span class="wishlist-price-withtax">~${formatMoney(totalWithTax)} with tax</span>` : ''}</div>
           ${remaining != null ? `<div class="wishlist-balance-after ${remaining < 0 ? 'negative' : ''}">${remaining >= 0 ? `${formatMoney(remaining)} left after` : `Need ${formatMoney(Math.abs(remaining))} more`}</div>` : ''}
           <a class="wishlist-link" href="${sanitizeUrl(item.url)}" target="_blank" rel="noopener">View product ↗</a>
         </div>

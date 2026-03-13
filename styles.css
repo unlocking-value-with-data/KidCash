@@ -585,6 +585,13 @@ body {
   margin-bottom: 2px;
 }
 
+.wishlist-price-withtax {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-light);
+  margin-bottom: 2px;
+}
+
 .wishlist-link {
   font-size: 12px;
   color: var(--text-light);
