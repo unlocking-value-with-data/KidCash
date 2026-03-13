@@ -9,6 +9,7 @@ function getDefaultData() {
     ],
     transactions: [],
     goals: [],
+    chores: [],
     recurringActivities: [],
     activeKidIndex: 0,
   };
@@ -21,6 +22,7 @@ function loadData() {
       const data = JSON.parse(raw);
       if (!data.goals) data.goals = [];
       if (!data.wishlist) data.wishlist = [];
+      if (!data.chores) data.chores = [];
       if (!data.recurringActivities) data.recurringActivities = [];
       return data;
     }
@@ -51,6 +53,7 @@ async function writeToFirestore(uid, data) {
     transactions: data.transactions || [],
     goals: data.goals || [],
     wishlist: data.wishlist || [],
+    chores: data.chores || [],
     recurringActivities: data.recurringActivities || [],
     activeKidIndex: data.activeKidIndex || 0,
     updatedAt: data.updatedAt || Date.now(),
@@ -130,6 +133,7 @@ async function loadFromFirestore(uid) {
       const cloudTime = cloudData.updatedAt || 0;
       if (!cloudData.goals) cloudData.goals = [];
       if (!cloudData.wishlist) cloudData.wishlist = [];
+      if (!cloudData.chores) cloudData.chores = [];
       if (!cloudData.recurringActivities) cloudData.recurringActivities = [];
 
       if (localTime > cloudTime && localData.transactions?.length > 0) {
@@ -205,6 +209,7 @@ let currentView = 'home'; // 'home' | 'activity' | 'goals' | 'settings'
 let modalOpen = null; // null | 'transaction' | 'goal' | 'wishlist' | 'recurring'
 let txType = 'income';
 let recurringType = 'income';
+let choreRepeating = false;
 let confirmAction = null;
 let pendingWishlistPurchase = null;
 let fetchStatus = null;
@@ -254,6 +259,10 @@ function getKidWishlist(kidId) {
   return state.wishlist
     .filter(w => w.kidId === kidId)
     .sort((a, b) => b.addedAt - a.addedAt);
+}
+
+function getKidChores(kidId) {
+  return (state.chores || []).filter(c => c.kidId === kidId);
 }
 
 function getBalance(kidId) {
@@ -883,10 +892,12 @@ function renderHomePage() {
   const transactions = getKidTransactions(kid.id).slice(0, 3);
   const goals = getKidGoals(kid.id);
   const wishlist = getKidWishlist(kid.id);
+  const chores = getKidChores(kid.id);
 
   return `
     ${renderBalanceCard(kid, balance, income, expenses)}
     ${renderQuickActions()}
+    ${isInKidMode() ? renderKidChoresSnapshot(chores) : renderPendingApprovalsSnapshot()}
     ${renderGoalsSnapshot(goals, balance)}
     ${renderWishlistSnapshot(wishlist)}
     ${renderRecentActivitySnapshot(transactions)}
@@ -1010,6 +1021,71 @@ function renderRecentActivitySnapshot(transactions) {
           <p>No transactions yet. Add some money to get started!</p>
         </div>
       `}
+    </div>
+  `;
+}
+
+// ─── Chore Snapshots ─────────────────────────────────────────
+function renderKidChoresSnapshot(chores) {
+  const available = chores.filter(c => c.status === 'available');
+  const pending = chores.filter(c => c.status === 'pending');
+  if (available.length === 0 && pending.length === 0) return '';
+  return `
+    <div class="section">
+      <div class="section-header">
+        <h3 class="section-title">🧹 My Chores</h3>
+      </div>
+      <div class="chore-list">
+        ${available.map(c => `
+          <div class="chore-item">
+            <div class="chore-info">
+              <div class="chore-name">${escapeHtml(c.name)}</div>
+              <div class="chore-amount">+${formatMoney(c.amount)}</div>
+            </div>
+            <button class="chore-done-btn" onclick="markChoreDone('${sanitizeId(c.id)}')">Done!</button>
+          </div>
+        `).join('')}
+        ${pending.map(c => `
+          <div class="chore-item pending">
+            <div class="chore-info">
+              <div class="chore-name">${escapeHtml(c.name)}</div>
+              <div class="chore-amount">+${formatMoney(c.amount)}</div>
+            </div>
+            <span class="chore-pending-badge">Waiting...</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderPendingApprovalsSnapshot() {
+  const pending = (state.chores || []).filter(c => c.status === 'pending');
+  if (pending.length === 0) return '';
+  return `
+    <div class="section">
+      <div class="section-header">
+        <h3 class="section-title">🧹 Chore Approvals</h3>
+        <span class="approval-badge">${pending.length}</span>
+      </div>
+      <div class="chore-list">
+        ${pending.map(c => {
+          const kid = state.kids.find(k => k.id === c.kidId);
+          const kidName = kid ? escapeHtml(kid.name) : 'Unknown';
+          return `
+            <div class="chore-item approval">
+              <div class="chore-info">
+                <div class="chore-name">${escapeHtml(c.name)}</div>
+                <div class="chore-amount">${kidName} · +${formatMoney(c.amount)}</div>
+              </div>
+              <div class="chore-approval-btns">
+                <button class="chore-approve-btn" onclick="approveChore('${sanitizeId(c.id)}')">✓</button>
+                <button class="chore-reject-btn" onclick="rejectChore('${sanitizeId(c.id)}')">✕</button>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
     </div>
   `;
 }
@@ -1141,6 +1217,32 @@ function renderSettingsPage() {
     </div>
 
     <div class="settings-section">
+      <label class="settings-section-label">Chores</label>
+      ${(state.chores || []).length === 0
+        ? '<p class="settings-about" style="margin-bottom:12px">No chores set up yet. Add one below.</p>'
+        : (state.chores || []).map(c => {
+            const kid = state.kids.find(k => k.id === c.kidId);
+            const kidName = kid ? escapeHtml(kid.name) : 'Unknown';
+            const statusLabel = c.status === 'pending' ? '⏳ Pending' : c.status === 'approved' ? '✓ Done' : '○ Available';
+            return `
+              <div class="recurring-item">
+                <div class="recurring-icon income">🧹</div>
+                <div class="recurring-details">
+                  <div class="recurring-desc">${escapeHtml(c.name)}</div>
+                  <div class="recurring-meta">${kidName} · +${formatMoney(c.amount)}${c.repeating ? ' · Repeating' : ''}</div>
+                  <div class="recurring-next">${statusLabel}</div>
+                </div>
+                <div class="recurring-actions">
+                  <button class="remove-kid" onclick="confirmDeleteChore('${sanitizeId(c.id)}')">✕</button>
+                </div>
+              </div>
+            `;
+          }).join('')
+      }
+      <button class="add-kid-btn" onclick="openModal('chore')">+ Add Chore</button>
+    </div>
+
+    <div class="settings-section">
       <label class="settings-section-label">Recurring Activities</label>
       ${(state.recurringActivities || []).length === 0
         ? '<p class="settings-about" style="margin-bottom:12px">No recurring activities yet. Add one below.</p>'
@@ -1269,7 +1371,40 @@ function renderModal() {
   if (modalOpen === 'goal') return renderGoalModal();
   if (modalOpen === 'wishlist') return renderWishlistModal();
   if (modalOpen === 'recurring') return renderRecurringModal();
+  if (modalOpen === 'chore') return renderChoreModal();
   return '';
+}
+
+function renderChoreModal() {
+  return `
+    <div class="modal-overlay open" onclick="handleOverlayClick(event)">
+      <div class="modal">
+        <div class="modal-handle"></div>
+        <h2>Add Chore</h2>
+        <div class="form-group">
+          <label>For</label>
+          <select id="choreKid">
+            ${state.kids.map(k => `<option value="${escapeHtml(k.id)}">${escapeHtml(k.name)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Chore</label>
+          <input type="text" id="choreName" placeholder="e.g., Take out trash">
+        </div>
+        <div class="form-group">
+          <label>Payment</label>
+          <input type="number" id="choreAmount" placeholder="0.00" step="0.01" min="0.01" inputmode="decimal">
+        </div>
+        <div class="settings-toggle-row" style="margin-bottom:16px">
+          <span>Repeating (resets after approval)</span>
+          <button class="toggle-switch" id="choreRepeatingToggle" onclick="toggleChoreRepeating()">
+            <span class="toggle-knob"></span>
+          </button>
+        </div>
+        <button class="submit-btn green" onclick="submitChore()">Add Chore</button>
+      </div>
+    </div>
+  `;
 }
 
 function renderRecurringModal() {
@@ -1500,6 +1635,12 @@ function bindEvents() {
       if (el) el.focus();
     }, 100);
   }
+  if (modalOpen === 'chore') {
+    setTimeout(() => {
+      const el = document.getElementById('choreName');
+      if (el) el.focus();
+    }, 100);
+  }
   if (modalOpen === 'transaction' && pendingWishlistPurchase && txType === 'expense') {
     setTimeout(() => {
       const amtEl = document.getElementById('txAmount');
@@ -1528,6 +1669,7 @@ window.openTransactionModal = function(type) {
 window.openModal = function(type) {
   modalOpen = type;
   if (type === 'recurring') recurringType = 'income';
+  if (type === 'chore') choreRepeating = false;
   render();
 };
 
@@ -1646,6 +1788,86 @@ window.submitGoal = function() {
   render();
 };
 
+window.toggleChoreRepeating = function() {
+  choreRepeating = !choreRepeating;
+  const btn = document.getElementById('choreRepeatingToggle');
+  if (btn) btn.className = `toggle-switch ${choreRepeating ? 'active' : ''}`;
+};
+
+window.submitChore = function() {
+  const kidId = document.getElementById('choreKid').value;
+  const name = document.getElementById('choreName').value.trim();
+  const amount = parseMoney(document.getElementById('choreAmount').value);
+  if (!name) { shakeElement('choreName'); return; }
+  if (!amount) { shakeElement('choreAmount'); return; }
+  if (!state.chores) state.chores = [];
+  state.chores.push({
+    id: generateId(),
+    kidId,
+    name,
+    amount,
+    repeating: choreRepeating,
+    status: 'available',
+    createdAt: Date.now(),
+  });
+  saveData(state);
+  modalOpen = null;
+  render();
+};
+
+window.markChoreDone = function(id) {
+  const chore = (state.chores || []).find(c => c.id === id);
+  if (!chore || chore.status !== 'available') return;
+  chore.status = 'pending';
+  chore.completedAt = Date.now();
+  saveData(state);
+  render();
+};
+
+window.approveChore = function(id) {
+  const chore = (state.chores || []).find(c => c.id === id);
+  if (!chore || chore.status !== 'pending') return;
+  state.transactions.push({
+    id: generateId(),
+    kidId: chore.kidId,
+    type: 'income',
+    amount: chore.amount,
+    description: chore.name,
+    category: 'chores',
+    timestamp: Date.now(),
+    createdBy: 'parent',
+  });
+  if (chore.repeating) {
+    chore.status = 'available';
+    chore.completedAt = undefined;
+  } else {
+    chore.status = 'approved';
+    chore.approvedAt = Date.now();
+  }
+  saveData(state);
+  render();
+};
+
+window.rejectChore = function(id) {
+  const chore = (state.chores || []).find(c => c.id === id);
+  if (!chore || chore.status !== 'pending') return;
+  chore.status = 'available';
+  chore.completedAt = undefined;
+  saveData(state);
+  render();
+};
+
+window.confirmDeleteChore = function(id) {
+  confirmAction = {
+    message: 'Remove this chore?',
+    action: () => {
+      state.chores = (state.chores || []).filter(c => c.id !== id);
+      saveData(state);
+    },
+  };
+  render();
+};
+
 window.setRecurringType = function(type) {
   recurringType = type;
   const incomeBtn = document.getElementById('recurringTypeIncome');
@@ -1746,6 +1968,7 @@ window.confirmRemoveKid = function(index) {
       state.kids.splice(index, 1);
       state.transactions = state.transactions.filter(t => t.kidId !== kidId);
       state.goals = state.goals.filter(g => g.kidId !== kidId);
+      state.chores = (state.chores || []).filter(c => c.kidId !== kidId);
       state.recurringActivities = (state.recurringActivities || []).filter(r => r.kidId !== kidId);
       if (state.activeKidIndex >= state.kids.length) {
         state.activeKidIndex = state.kids.length - 1;
