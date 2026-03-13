@@ -9,6 +9,7 @@ function getDefaultData() {
     ],
     transactions: [],
     goals: [],
+    recurringActivities: [],
     activeKidIndex: 0,
   };
 }
@@ -20,6 +21,7 @@ function loadData() {
       const data = JSON.parse(raw);
       if (!data.goals) data.goals = [];
       if (!data.wishlist) data.wishlist = [];
+      if (!data.recurringActivities) data.recurringActivities = [];
       return data;
     }
   } catch (e) {
@@ -49,6 +51,7 @@ async function writeToFirestore(uid, data) {
     transactions: data.transactions || [],
     goals: data.goals || [],
     wishlist: data.wishlist || [],
+    recurringActivities: data.recurringActivities || [],
     activeKidIndex: data.activeKidIndex || 0,
     updatedAt: data.updatedAt || Date.now(),
   };
@@ -127,6 +130,7 @@ async function loadFromFirestore(uid) {
       const cloudTime = cloudData.updatedAt || 0;
       if (!cloudData.goals) cloudData.goals = [];
       if (!cloudData.wishlist) cloudData.wishlist = [];
+      if (!cloudData.recurringActivities) cloudData.recurringActivities = [];
 
       if (localTime > cloudTime && localData.transactions?.length > 0) {
         // Local data is newer — use it and push to Firestore
@@ -161,11 +165,46 @@ function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
+// ─── Recurring Activities ────────────────────────────────────
+function getNextDueDate(fromTimestamp, frequency) {
+  const d = new Date(fromTimestamp);
+  if (frequency === 'weekly') d.setDate(d.getDate() + 7);
+  else if (frequency === 'biweekly') d.setDate(d.getDate() + 14);
+  else if (frequency === 'monthly') d.setMonth(d.getMonth() + 1);
+  return d.getTime();
+}
+
+function processRecurringActivities() {
+  if (!state.recurringActivities || !state.recurringActivities.length) return;
+  const now = Date.now();
+  let changed = false;
+  state.recurringActivities.forEach(r => {
+    if (!r.active) return;
+    while (r.nextDue <= now) {
+      state.transactions.push({
+        id: generateId(),
+        kidId: r.kidId,
+        type: r.type,
+        amount: r.amount,
+        description: r.description,
+        category: r.category,
+        timestamp: r.nextDue,
+        createdBy: 'parent',
+        recurringId: r.id,
+      });
+      r.nextDue = getNextDueDate(r.nextDue, r.frequency);
+      changed = true;
+    }
+  });
+  if (changed) saveData(state);
+}
+
 // ─── State ────────────────────────────────────────────────────
 let state = loadData();
 let currentView = 'home'; // 'home' | 'activity' | 'goals' | 'settings'
-let modalOpen = null; // null | 'transaction' | 'goal' | 'wishlist'
+let modalOpen = null; // null | 'transaction' | 'goal' | 'wishlist' | 'recurring'
 let txType = 'income';
+let recurringType = 'income';
 let confirmAction = null;
 let pendingWishlistPurchase = null;
 let fetchStatus = null;
@@ -1102,6 +1141,37 @@ function renderSettingsPage() {
     </div>
 
     <div class="settings-section">
+      <label class="settings-section-label">Recurring Activities</label>
+      ${(state.recurringActivities || []).length === 0
+        ? '<p class="settings-about" style="margin-bottom:12px">No recurring activities yet. Add one below.</p>'
+        : (state.recurringActivities || []).map(r => {
+            const kid = state.kids.find(k => k.id === r.kidId);
+            const kidName = kid ? escapeHtml(kid.name) : 'Unknown';
+            const freqLabel = r.frequency === 'weekly' ? 'Weekly' : r.frequency === 'biweekly' ? 'Every 2 weeks' : 'Monthly';
+            const nextDate = new Date(r.nextDue).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            const icon = getCategoryIcon(r.type, r.category);
+            return `
+              <div class="recurring-item ${r.active ? '' : 'inactive'}">
+                <div class="recurring-icon ${r.type}">${icon}</div>
+                <div class="recurring-details">
+                  <div class="recurring-desc">${escapeHtml(r.description)}</div>
+                  <div class="recurring-meta">${kidName} · ${freqLabel} · ${r.type === 'income' ? '+' : '-'}${formatMoney(r.amount)}</div>
+                  <div class="recurring-next">Next: ${nextDate}</div>
+                </div>
+                <div class="recurring-actions">
+                  <button class="toggle-switch ${r.active ? 'active' : ''}" onclick="toggleRecurringActive('${sanitizeId(r.id)}')">
+                    <span class="toggle-knob"></span>
+                  </button>
+                  <button class="remove-kid" onclick="confirmDeleteRecurring('${sanitizeId(r.id)}')">✕</button>
+                </div>
+              </div>
+            `;
+          }).join('')
+      }
+      <button class="add-kid-btn" onclick="openModal('recurring')">+ Add Recurring Activity</button>
+    </div>
+
+    <div class="settings-section">
       <label class="settings-section-label">Default Sales Tax State</label>
       <div class="form-group" style="margin-bottom:0">
         <select id="settingsState" onchange="updateDefaultState(this.value)">
@@ -1198,7 +1268,54 @@ function renderModal() {
   if (modalOpen === 'transaction') return renderTransactionModal();
   if (modalOpen === 'goal') return renderGoalModal();
   if (modalOpen === 'wishlist') return renderWishlistModal();
+  if (modalOpen === 'recurring') return renderRecurringModal();
   return '';
+}
+
+function renderRecurringModal() {
+  const incomeCategories = CATEGORIES.income;
+  const expenseCategories = CATEGORIES.expense;
+  return `
+    <div class="modal-overlay open" onclick="handleOverlayClick(event)">
+      <div class="modal">
+        <div class="modal-handle"></div>
+        <h2>Add Recurring Activity</h2>
+        <div class="form-group">
+          <label>For</label>
+          <select id="recurringKid">
+            ${state.kids.map(k => `<option value="${escapeHtml(k.id)}">${escapeHtml(k.name)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="type-toggle">
+          <button id="recurringTypeIncome" class="${recurringType === 'income' ? 'active-income' : ''}" onclick="setRecurringType('income')">💵 Add Money</button>
+          <button id="recurringTypeExpense" class="${recurringType === 'expense' ? 'active-expense' : ''}" onclick="setRecurringType('expense')">🛒 Spending</button>
+        </div>
+        <div class="form-group">
+          <label>Amount</label>
+          <input type="number" id="recurringAmount" placeholder="0.00" step="0.01" min="0.01" inputmode="decimal">
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <input type="text" id="recurringDescription" placeholder="e.g., Weekly allowance">
+        </div>
+        <div class="form-group">
+          <label>Category</label>
+          <select id="recurringCategory">
+            ${CATEGORIES[recurringType].map(c => `<option value="${c.value}">${c.icon} ${c.label}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Frequency</label>
+          <select id="recurringFrequency">
+            <option value="weekly">Weekly</option>
+            <option value="biweekly">Every 2 weeks</option>
+            <option value="monthly">Monthly</option>
+          </select>
+        </div>
+        <button class="submit-btn ${recurringType === 'income' ? 'green' : ''}" id="recurringSubmitBtn" style="${recurringType === 'expense' ? 'background:var(--red)' : ''}" onclick="submitRecurringActivity()">Add Recurring Activity</button>
+      </div>
+    </div>
+  `;
 }
 
 function renderTransactionModal() {
@@ -1377,6 +1494,12 @@ function bindEvents() {
       if (el) el.focus();
     }, 100);
   }
+  if (modalOpen === 'recurring') {
+    setTimeout(() => {
+      const el = document.getElementById('recurringAmount');
+      if (el) el.focus();
+    }, 100);
+  }
   if (modalOpen === 'transaction' && pendingWishlistPurchase && txType === 'expense') {
     setTimeout(() => {
       const amtEl = document.getElementById('txAmount');
@@ -1404,6 +1527,7 @@ window.openTransactionModal = function(type) {
 
 window.openModal = function(type) {
   modalOpen = type;
+  if (type === 'recurring') recurringType = 'income';
   render();
 };
 
@@ -1522,6 +1646,75 @@ window.submitGoal = function() {
   render();
 };
 
+window.setRecurringType = function(type) {
+  recurringType = type;
+  const incomeBtn = document.getElementById('recurringTypeIncome');
+  const expenseBtn = document.getElementById('recurringTypeExpense');
+  const catSelect = document.getElementById('recurringCategory');
+  const submitBtn = document.getElementById('recurringSubmitBtn');
+  if (incomeBtn) incomeBtn.className = type === 'income' ? 'active-income' : '';
+  if (expenseBtn) expenseBtn.className = type === 'expense' ? 'active-expense' : '';
+  if (catSelect) {
+    catSelect.innerHTML = CATEGORIES[type].map(c => `<option value="${c.value}">${c.icon} ${c.label}</option>`).join('');
+  }
+  if (submitBtn) {
+    submitBtn.style.background = type === 'expense' ? 'var(--red)' : '';
+    submitBtn.className = `submit-btn ${type === 'income' ? 'green' : ''}`;
+  }
+};
+
+window.submitRecurringActivity = function() {
+  const kidId = document.getElementById('recurringKid').value;
+  const amount = parseMoney(document.getElementById('recurringAmount').value);
+  const description = document.getElementById('recurringDescription').value.trim();
+  const category = document.getElementById('recurringCategory').value;
+  const frequency = document.getElementById('recurringFrequency').value;
+  if (!amount) { shakeElement('recurringAmount'); return; }
+  if (!kidId) return;
+  if (!state.recurringActivities) state.recurringActivities = [];
+  const now = Date.now();
+  // First occurrence fires immediately (nextDue = now), then advance to next period
+  const recurring = {
+    id: generateId(),
+    kidId,
+    type: recurringType,
+    amount,
+    description: description || (recurringType === 'income' ? 'Recurring income' : 'Recurring expense'),
+    category,
+    frequency,
+    nextDue: now,
+    active: true,
+    createdAt: now,
+  };
+  state.recurringActivities.push(recurring);
+  // Process it immediately so the first transaction is added now
+  processRecurringActivities();
+  saveData(state);
+  modalOpen = null;
+  render();
+};
+
+window.toggleRecurringActive = function(id) {
+  const r = (state.recurringActivities || []).find(r => r.id === id);
+  if (!r) return;
+  r.active = !r.active;
+  // If reactivating, reset nextDue to now so it doesn't create a backlog
+  if (r.active) r.nextDue = Date.now();
+  saveData(state);
+  render();
+};
+
+window.confirmDeleteRecurring = function(id) {
+  confirmAction = {
+    message: 'Remove this recurring activity? Past transactions will remain.',
+    action: () => {
+      state.recurringActivities = (state.recurringActivities || []).filter(r => r.id !== id);
+      saveData(state);
+    },
+  };
+  render();
+};
+
 window.confirmDeleteTransaction = function(id) {
   confirmAction = {
     message: 'Delete this transaction? This will update the balance.',
@@ -1553,6 +1746,7 @@ window.confirmRemoveKid = function(index) {
       state.kids.splice(index, 1);
       state.transactions = state.transactions.filter(t => t.kidId !== kidId);
       state.goals = state.goals.filter(g => g.kidId !== kidId);
+      state.recurringActivities = (state.recurringActivities || []).filter(r => r.kidId !== kidId);
       if (state.activeKidIndex >= state.kids.length) {
         state.activeKidIndex = state.kids.length - 1;
       }
@@ -2048,6 +2242,7 @@ function initAuth() {
         kidModeEnabled = localStorage.getItem('kidcash_kidmode') === 'true';
         kidModeLocked = kidModeEnabled;
         kidModeKidIndex = null;
+        processRecurringActivities();
         appReady = true;
         render();
       } else {
