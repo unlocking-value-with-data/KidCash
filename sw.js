@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kidcash-v7';
+const CACHE_NAME = 'kidcash-v8';
 const ASSETS = [
   './',
   './index.html',

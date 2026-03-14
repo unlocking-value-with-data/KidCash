@@ -935,10 +935,80 @@ function renderHomePage() {
   return `
     ${renderBalanceCard(kid, balance, income, expenses)}
     ${renderQuickActions()}
+    ${renderChoresSnapshot(kid, balance)}
     ${renderGoalsSnapshot(goals, balance)}
     ${renderWishlistSnapshot(wishlist)}
     ${renderRecentActivitySnapshot(transactions)}
   `;
+}
+
+function renderChoresSnapshot(kid, balance) {
+  if (isInKidMode()) {
+    const myChores = getKidChores(kid.id);
+    const available = myChores.filter(c => c.status === 'available');
+    const pending = myChores.filter(c => c.status === 'pending');
+    if (available.length === 0 && pending.length === 0) return '';
+    const items = [...available, ...pending].slice(0, 3);
+    return `
+      <div class="section" onclick="navigateTo('chores')" style="cursor:pointer">
+        <div class="section-header">
+          <h3 class="section-title">🧹 Chores</h3>
+          <button class="section-link" onclick="event.stopPropagation();navigateTo('chores')">See All</button>
+        </div>
+        <div class="chore-list">
+          ${items.map(c => {
+            const isPending = c.status === 'pending';
+            return `
+              <div class="chore-item${isPending ? ' approval' : ''}">
+                <div class="chore-info">
+                  <div class="chore-name">${escapeHtml(c.name)}</div>
+                  <div class="chore-amount">${isPending ? '⏳ Awaiting approval' : `+${formatMoney(c.amount)}`}</div>
+                </div>
+                ${!isPending ? `<div class="chore-balance-preview">→ ${formatMoney(balance + c.amount)}</div>` : ''}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  } else {
+    const pending = (state.chores || []).filter(c => c.status === 'pending');
+    const available = (state.chores || []).filter(c => c.status === 'available');
+    if (pending.length === 0 && available.length === 0) return '';
+    return `
+      <div class="section" onclick="navigateTo('chores')" style="cursor:pointer">
+        <div class="section-header">
+          <h3 class="section-title">🧹 Chores${pending.length > 0 ? ` <span class="approval-badge">${pending.length}</span>` : ''}</h3>
+          <button class="section-link" onclick="event.stopPropagation();navigateTo('chores')">See All</button>
+        </div>
+        <div class="chore-list">
+          ${pending.slice(0, 2).map(c => {
+            const choreKid = state.kids.find(k => k.id === c.kidId);
+            const kidName = choreKid ? escapeHtml(choreKid.name) : 'Unknown';
+            return `
+              <div class="chore-item approval">
+                <div class="chore-info">
+                  <div class="chore-name">${escapeHtml(c.name)}</div>
+                  <div class="chore-amount">${kidName} · +${formatMoney(c.amount)}</div>
+                </div>
+                <div class="chore-approval-btns" onclick="event.stopPropagation()">
+                  <button class="chore-approve-btn" onclick="approveChore('${sanitizeId(c.id)}')">✓</button>
+                  <button class="chore-reject-btn" onclick="rejectChore('${sanitizeId(c.id)}')">✕</button>
+                </div>
+              </div>
+            `;
+          }).join('')}
+          ${pending.length === 0 ? `
+            <div class="chore-item">
+              <div class="chore-info">
+                <div class="chore-name" style="color:var(--text-muted)">${available.length} active chore${available.length !== 1 ? 's' : ''}</div>
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }
 }
 
 function renderBalanceCard(kid, balance, income, expenses) {
