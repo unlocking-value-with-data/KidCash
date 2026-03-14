@@ -955,16 +955,17 @@ function renderChoresSnapshot(kid, balance) {
           <h3 class="section-title">🧹 Chores</h3>
           <button class="section-link" onclick="event.stopPropagation();navigateTo('chores')">See All</button>
         </div>
-        <div class="chore-list">
+        <div class="transactions-list">
           ${items.map(c => {
             const isPending = c.status === 'pending';
             return `
-              <div class="chore-item${isPending ? ' approval' : ''}">
-                <div class="chore-info">
-                  <div class="chore-name">${escapeHtml(c.name)}</div>
-                  <div class="chore-amount">${isPending ? '⏳ Awaiting approval' : `+${formatMoney(c.amount)}`}</div>
+              <div class="transaction-item${isPending ? ' chore-pending-item' : ''}">
+                <div class="tx-icon income">🧹</div>
+                <div class="tx-details">
+                  <div class="tx-description">${escapeHtml(c.name)}</div>
+                  <div class="tx-date">${isPending ? '⏳ Awaiting approval' : `→ ${formatMoney(balance + c.amount)} after`}</div>
                 </div>
-                ${!isPending ? `<div class="chore-balance-preview">→ ${formatMoney(balance + c.amount)}</div>` : ''}
+                <div class="tx-amount income">${isPending ? '⏳' : `+${formatMoney(c.amount)}`}</div>
               </div>
             `;
           }).join('')}
@@ -975,41 +976,34 @@ function renderChoresSnapshot(kid, balance) {
     const pending = (state.chores || []).filter(c => c.status === 'pending');
     const available = (state.chores || []).filter(c => c.status === 'available');
     if (pending.length === 0 && available.length === 0) return '';
+    const items = pending.length > 0 ? pending.slice(0, 3) : available.slice(0, 3);
     return `
       <div class="section" onclick="navigateTo('chores')" style="cursor:pointer">
         <div class="section-header">
           <h3 class="section-title">🧹 Chores${pending.length > 0 ? ` <span class="approval-badge">${pending.length}</span>` : ''}</h3>
           <button class="section-link" onclick="event.stopPropagation();navigateTo('chores')">See All</button>
         </div>
-        <div class="chore-list">
-          ${pending.slice(0, 2).map(c => {
+        <div class="transactions-list">
+          ${items.map(c => {
             const choreKid = state.kids.find(k => k.id === c.kidId);
             const kidName = choreKid ? escapeHtml(choreKid.name) : 'Unknown';
+            const isPending = c.status === 'pending';
             return `
-              <div class="chore-item approval">
-                <div class="chore-info">
-                  <div class="chore-name">${escapeHtml(c.name)}</div>
-                  <div class="chore-amount">${kidName} · +${formatMoney(c.amount)}</div>
+              <div class="transaction-item${isPending ? ' chore-pending-item' : ''}">
+                <div class="tx-icon income">🧹</div>
+                <div class="tx-details">
+                  <div class="tx-description">${escapeHtml(c.name)}</div>
+                  <div class="tx-date">${kidName}${isPending ? ' · ⏳ Needs approval' : ''}</div>
                 </div>
-                <div class="chore-approval-btns" onclick="event.stopPropagation()">
-                  <button class="chore-approve-btn" onclick="approveChore('${sanitizeId(c.id)}')">✓</button>
-                  <button class="chore-reject-btn" onclick="rejectChore('${sanitizeId(c.id)}')">✕</button>
-                </div>
+                ${isPending ? `
+                  <div class="chore-approval-btns" onclick="event.stopPropagation()">
+                    <button class="chore-approve-btn" onclick="approveChore('${sanitizeId(c.id)}')">✓</button>
+                    <button class="chore-reject-btn" onclick="rejectChore('${sanitizeId(c.id)}')">✕</button>
+                  </div>
+                ` : `<div class="tx-amount income">+${formatMoney(c.amount)}</div>`}
               </div>
             `;
           }).join('')}
-          ${pending.length === 0 ? available.slice(0, 3).map(c => {
-            const choreKid = state.kids.find(k => k.id === c.kidId);
-            const kidName = choreKid ? escapeHtml(choreKid.name) : 'Unknown';
-            return `
-              <div class="chore-item">
-                <div class="chore-info">
-                  <div class="chore-name">${escapeHtml(c.name)}</div>
-                  <div class="chore-amount">${kidName} · +${formatMoney(c.amount)}</div>
-                </div>
-              </div>
-            `;
-          }).join('') : ''}
         </div>
       </div>
     `;
