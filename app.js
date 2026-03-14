@@ -34,7 +34,17 @@ function loadData() {
   return getDefaultData();
 }
 
+const BACKUP_KEY = 'kidcash_backup';
+
 function saveData(data) {
+  // Safety: never overwrite existing transactions with an empty array
+  try {
+    const existing = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    if ((existing.transactions?.length || 0) > 0 && (data.transactions?.length || 0) === 0) {
+      console.error('saveData safety check: refusing to overwrite transactions with empty array');
+      return;
+    }
+  } catch (e) { /* ignore parse errors */ }
   data.updatedAt = Date.now();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   scheduleSyncToFirestore();
@@ -72,7 +82,7 @@ function scheduleSyncToFirestore() {
   _syncTimer = setTimeout(flushToFirestore, 1500);
 }
 
-// Flush latest localStorage data to Firestore
+// Flush in-memory state to Firestore
 async function flushToFirestore() {
   if (!currentUser || !window.fbSetDoc) return;
   clearTimeout(_syncTimer);
@@ -83,10 +93,18 @@ async function flushToFirestore() {
     return;
   }
 
+  // Safety: don't sync if in-memory state has no transactions but localStorage does
+  try {
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    if ((stored.transactions?.length || 0) > 0 && (state.transactions?.length || 0) === 0) {
+      console.error('flushToFirestore safety check: in-memory state looks empty, aborting sync');
+      return;
+    }
+  } catch (e) { /* ignore */ }
+
   _syncInProgress = true;
   try {
-    const data = loadData(); // Always read the latest from localStorage
-    await writeToFirestore(currentUser.uid, data);
+    await writeToFirestore(currentUser.uid, state); // use in-memory state, not re-read from localStorage
     if (syncStatus !== 'ok') {
       syncStatus = 'ok';
       render();
@@ -139,13 +157,17 @@ async function loadFromFirestore(uid) {
       if (!cloudData.chores) cloudData.chores = [];
       if (!cloudData.recurringActivities) cloudData.recurringActivities = [];
 
-      if (localTime > cloudTime && localData.transactions?.length > 0) {
-        // Local data is newer — use it and push to Firestore
-        console.log('Local data is newer, syncing to cloud');
+      const localTxCount = localData.transactions?.length || 0;
+      const cloudTxCount = cloudData.transactions?.length || 0;
+      // Prefer whichever has more transactions; break ties with timestamp
+      const useLocal = localTxCount > cloudTxCount ||
+        (localTxCount === cloudTxCount && localTime > cloudTime && localTxCount > 0);
+      if (useLocal) {
+        console.log(`Local data wins (${localTxCount} tx local vs ${cloudTxCount} tx cloud), syncing to cloud`);
         state = localData;
         await writeToFirestore(uid, state);
       } else {
-        // Cloud data is newer or same — use it
+        // Cloud data is richer or same — use it
         state = cloudData;
       }
     } else if (localData.transactions?.length > 0) {
@@ -160,8 +182,9 @@ async function loadFromFirestore(uid) {
       state.updatedAt = Date.now();
       await writeToFirestore(uid, state);
     }
-    // Cache locally
+    // Cache locally and save a backup of this known-good Firestore state
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    localStorage.setItem(BACKUP_KEY, JSON.stringify(state));
   } catch (e) {
     console.error('Firestore load failed, using local data:', e);
     state = loadData();
