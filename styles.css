@@ -936,6 +936,16 @@ body {
 .goal-balance-after.negative {
   color: var(--red);
 }
+.goal-tax-note {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+.goal-tax-badge {
+  font-size: 10px;
+  color: var(--text-secondary);
+  font-weight: 400;
+}
 
 .wishlist-balance-after {
   font-size: 12px;

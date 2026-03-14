@@ -986,14 +986,16 @@ function renderGoalsSnapshot(goals, balance) {
 }
 
 function renderGoalCardCompact(goal, balance) {
-  const percent = goal.target > 0 ? Math.min(100, Math.round((balance / goal.target) * 100)) : 0;
+  const tax = calcTax(goal.target, selectedState);
+  const effectiveTarget = goal.target + tax;
+  const percent = effectiveTarget > 0 ? Math.min(100, Math.round((balance / effectiveTarget) * 100)) : 0;
   const isComplete = percent >= 100;
-  const remaining = balance - goal.target;
+  const remaining = balance - effectiveTarget;
   return `
     <div class="goal-card compact">
       <div class="goal-top">
         <div class="goal-name">🎯 ${escapeHtml(goal.name)}</div>
-        <div class="goal-amount">${formatMoney(balance)} / ${formatMoney(goal.target)}</div>
+        <div class="goal-amount">${formatMoney(balance)} / ${formatMoney(effectiveTarget)}${tax > 0 ? ' <span class="goal-tax-badge">incl. tax</span>' : ''}</div>
       </div>
       <div class="goal-progress-bar">
         <div class="goal-progress-fill ${isComplete ? 'complete' : ''}" style="width: ${percent}%"></div>
@@ -1556,15 +1558,18 @@ function renderSettingsPage() {
 
 // ─── Reusable Card Components ────────────────────────────────
 function renderGoalCard(goal, balance) {
-  const percent = goal.target > 0 ? Math.min(100, Math.round((balance / goal.target) * 100)) : 0;
+  const tax = calcTax(goal.target, selectedState);
+  const effectiveTarget = goal.target + tax;
+  const percent = effectiveTarget > 0 ? Math.min(100, Math.round((balance / effectiveTarget) * 100)) : 0;
   const isComplete = percent >= 100;
-  const remaining = balance - goal.target;
+  const remaining = balance - effectiveTarget;
   return `
     <div class="goal-card">
       <div class="goal-top">
         <div class="goal-name">🎯 ${escapeHtml(goal.name)}</div>
-        <div class="goal-amount">${formatMoney(balance)} / ${formatMoney(goal.target)}</div>
+        <div class="goal-amount">${formatMoney(balance)} / ${formatMoney(effectiveTarget)}</div>
       </div>
+      ${tax > 0 ? `<div class="goal-tax-note">Includes ${formatMoney(tax)} tax (${STATE_TAX_RATES[selectedState]?.rate}%)</div>` : ''}
       <div class="goal-progress-bar">
         <div class="goal-progress-fill ${isComplete ? 'complete' : ''}" style="width: ${percent}%"></div>
       </div>
