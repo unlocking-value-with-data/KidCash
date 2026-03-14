@@ -1296,10 +1296,8 @@ const SUGGESTED_CHORES = [
 
 function getChoreTemplates() {
   if (state.choreTemplates) return state.choreTemplates;
-  // First time: seed from defaults and save
-  state.choreTemplates = SUGGESTED_CHORES.map(s => ({ id: generateId(), name: s.name, amount: s.amount }));
-  saveData(state);
-  return state.choreTemplates;
+  // Return defaults without saving during render — saved on first user action
+  return SUGGESTED_CHORES.map(s => ({ id: generateId(), name: s.name, amount: s.amount }));
 }
 
 function renderChoresPage() {
@@ -2079,7 +2077,8 @@ window.submitTemplate = function() {
   const amount = parseMoney(document.getElementById('templateAmount').value);
   if (!name) { shakeElement('templateName'); return; }
   if (!amount) { shakeElement('templateAmount'); return; }
-  const templates = getChoreTemplates();
+  if (!state.choreTemplates) state.choreTemplates = getChoreTemplates();
+  const templates = state.choreTemplates;
   if (editingTemplateId) {
     const t = templates.find(t => t.id === editingTemplateId);
     if (t) { t.name = name; t.amount = amount; }
@@ -2097,7 +2096,8 @@ window.confirmDeleteTemplate = function(id) {
   confirmAction = {
     message: 'Remove this template from Quick Add?',
     action: () => {
-      state.choreTemplates = getChoreTemplates().filter(t => t.id !== id);
+      if (!state.choreTemplates) state.choreTemplates = getChoreTemplates();
+      state.choreTemplates = state.choreTemplates.filter(t => t.id !== id);
       saveData(state);
     },
   };
