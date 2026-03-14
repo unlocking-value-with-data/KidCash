@@ -636,7 +636,7 @@ function render() {
 
   const kidMode = isInKidMode();
   // In kid mode, block settings access
-  const effectiveView = (kidMode && (currentView === 'settings' || currentView === 'chores')) ? 'home' : currentView;
+  const effectiveView = (kidMode && currentView === 'settings') ? 'home' : currentView;
 
   let pageContent = '';
   switch (effectiveView) {
@@ -838,6 +838,7 @@ function renderBottomNav() {
     { id: 'home',     icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>', label: 'Home' },
     { id: 'activity', icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>', label: 'Activity' },
     { id: 'goals',    icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>', label: 'Goals' },
+    { id: 'chores',   icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>', label: 'Chores' },
     { id: 'settings', icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>', label: 'Settings' },
   ];
 
@@ -849,7 +850,7 @@ function renderBottomNav() {
                 onclick="navigateTo('${tab.id}')">
           <span class="bottom-nav-icon-wrap">
             ${tab.icon}
-            ${tab.id === 'home' && pendingChores > 0 ? `<span class="nav-badge">${pendingChores}</span>` : ''}
+            ${tab.id === 'chores' && pendingChores > 0 ? `<span class="nav-badge">${pendingChores}</span>` : ''}
           </span>
           <span class="bottom-nav-label">${tab.label}</span>
         </button>
@@ -863,6 +864,7 @@ function renderKidModeBottomNav() {
     { id: 'home',     icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>', label: 'Home' },
     { id: 'activity', icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>', label: 'Activity' },
     { id: 'goals',    icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>', label: 'Goals' },
+    { id: 'chores',   icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>', label: 'Chores' },
     { id: 'lock',     icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>', label: 'Lock' },
   ];
 
@@ -899,12 +901,10 @@ function renderHomePage() {
   const transactions = getKidTransactions(kid.id).slice(0, 3);
   const goals = getKidGoals(kid.id);
   const wishlist = getKidWishlist(kid.id);
-  const chores = getKidChores(kid.id);
 
   return `
     ${renderBalanceCard(kid, balance, income, expenses)}
     ${renderQuickActions()}
-    ${isInKidMode() ? renderKidChoresSnapshot(chores) : renderPendingApprovalsSnapshot()}
     ${renderGoalsSnapshot(goals, balance)}
     ${renderWishlistSnapshot(wishlist)}
     ${renderRecentActivitySnapshot(transactions)}
@@ -1195,35 +1195,114 @@ const SUGGESTED_CHORES = [
 ];
 
 function renderChoresPage() {
-  const chores = state.chores || [];
-  const active = chores.filter(c => c.status !== 'approved');
+  const kidMode = isInKidMode();
+  const kid = getActiveKid();
+  const allChores = state.chores || [];
+
+  if (kidMode) {
+    // ── Kid View ──────────────────────────────────────
+    const myChores = allChores.filter(c => c.kidId === kid.id && c.status !== 'approved');
+    const available = myChores.filter(c => c.status === 'available');
+    const pending = myChores.filter(c => c.status === 'pending');
+
+    if (myChores.length === 0) return `
+      <div class="empty-state" style="margin-top:48px">
+        <div class="empty-icon">🧹</div>
+        <p>No chores assigned yet. Ask a parent to add some!</p>
+      </div>
+    `;
+
+    return `
+      ${available.length > 0 ? `
+        <div class="section">
+          <div class="section-header">
+            <h3 class="section-title">Available</h3>
+          </div>
+          <div class="chore-cards">
+            ${available.map(c => `
+              <div class="chore-card available">
+                <div class="chore-card-icon">🧹</div>
+                <div class="chore-card-name">${escapeHtml(c.name)}</div>
+                <div class="chore-card-amount">+${formatMoney(c.amount)}</div>
+                <button class="chore-done-btn" onclick="markChoreDone('${sanitizeId(c.id)}')">Done! ✓</button>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+      ${pending.length > 0 ? `
+        <div class="section">
+          <div class="section-header">
+            <h3 class="section-title">Waiting for Approval</h3>
+          </div>
+          <div class="chore-cards">
+            ${pending.map(c => `
+              <div class="chore-card pending">
+                <div class="chore-card-icon">⏳</div>
+                <div class="chore-card-name">${escapeHtml(c.name)}</div>
+                <div class="chore-card-amount">+${formatMoney(c.amount)}</div>
+                <div class="chore-card-status">Awaiting parent approval</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+    `;
+  }
+
+  // ── Parent View ──────────────────────────────────────
+  const pendingAll = allChores.filter(c => c.status === 'pending');
+  const activeAll = allChores.filter(c => c.status !== 'approved');
+
   return `
-    <div class="page-back-btn-row">
-      <button class="page-back-btn" onclick="navigateTo('settings')">← Settings</button>
-    </div>
+    ${pendingAll.length > 0 ? `
+      <div class="section chore-approvals-section">
+        <div class="section-header">
+          <h3 class="section-title">⏳ Needs Approval</h3>
+          <span class="approval-badge">${pendingAll.length}</span>
+        </div>
+        <div class="chore-approval-list">
+          ${pendingAll.map(c => {
+            const kid = state.kids.find(k => k.id === c.kidId);
+            const kidName = kid ? escapeHtml(kid.name) : 'Unknown';
+            return `
+              <div class="chore-approval-card">
+                <div class="chore-approval-info">
+                  <div class="chore-approval-name">${escapeHtml(c.name)}</div>
+                  <div class="chore-approval-kid">${kidName} · +${formatMoney(c.amount)}</div>
+                </div>
+                <div class="chore-approval-btns">
+                  <button class="chore-approve-btn" onclick="approveChore('${sanitizeId(c.id)}')">✓ Approve</button>
+                  <button class="chore-reject-btn" onclick="rejectChore('${sanitizeId(c.id)}')">✕</button>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    ` : ''}
 
     <div class="section">
       <div class="section-header">
         <h3 class="section-title">Active Chores</h3>
         <button class="section-link" onclick="openModal('chore')">+ Add</button>
       </div>
-      ${active.length === 0 ? `
+      ${activeAll.filter(c => c.status !== 'pending').length === 0 && pendingAll.length === 0 ? `
         <div class="empty-state">
           <div class="empty-icon">🧹</div>
-          <p>No chores yet. Add one below or pick from suggestions.</p>
+          <p>No chores yet. Add one or pick from suggestions below.</p>
         </div>
-      ` : `
+      ` : activeAll.filter(c => c.status === 'available').length === 0 ? '' : `
         <div class="chore-list">
-          ${active.map(c => {
+          ${activeAll.filter(c => c.status === 'available').map(c => {
             const kid = state.kids.find(k => k.id === c.kidId);
             const kidName = kid ? escapeHtml(kid.name) : 'Unknown';
-            const statusLabel = c.status === 'pending' ? '⏳ Awaiting approval' : '○ Available';
             return `
               <div class="chore-item">
+                <div class="chore-card-icon" style="font-size:20px;margin-right:4px">🧹</div>
                 <div class="chore-info">
                   <div class="chore-name">${escapeHtml(c.name)}</div>
                   <div class="chore-amount">${kidName} · +${formatMoney(c.amount)}${c.repeating ? ' · Repeating' : ''}</div>
-                  <div class="chore-amount" style="margin-top:2px">${statusLabel}</div>
                 </div>
                 <button class="tx-delete" onclick="confirmDeleteChore('${sanitizeId(c.id)}')">✕</button>
               </div>
@@ -1235,7 +1314,7 @@ function renderChoresPage() {
 
     <div class="section">
       <div class="section-header">
-        <h3 class="section-title">Suggestions</h3>
+        <h3 class="section-title">Quick Add</h3>
       </div>
       <div class="chore-suggestions">
         ${SUGGESTED_CHORES.map(s => `
@@ -1299,14 +1378,6 @@ function renderSettingsPage() {
           <span class="toggle-knob"></span>
         </button>
       </div>
-    </div>
-
-    <div class="settings-section">
-      <label class="settings-section-label">Chores</label>
-      <button class="settings-nav-btn" onclick="navigateTo('chores')">
-        <span>Manage Chores</span>
-        <span class="settings-nav-count">${(state.chores || []).filter(c => c.status !== 'approved').length} active →</span>
-      </button>
     </div>
 
     <div class="settings-section">
