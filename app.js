@@ -1484,6 +1484,30 @@ function renderChoresPage() {
           </div>
         </div>
       ` : ''}
+      ${(() => {
+        const activeNames = new Set(myChores.filter(c => c.status === 'available' || c.status === 'pending').map(c => c.name));
+        const selfAddable = getChoreTemplates().filter(t => t.kidCanAdd && !activeNames.has(t.name));
+        if (selfAddable.length === 0) return '';
+        return `
+          <div class="section">
+            <div class="section-header">
+              <h3 class="section-title">Add a Chore</h3>
+            </div>
+            <div class="chore-cards">
+              ${selfAddable.map(t => `
+                <div class="chore-card add-from-template">
+                  <div class="chore-card-icon">${t.autoApprove ? '⚡' : '🧹'}</div>
+                  <div class="chore-card-name">${escapeHtml(t.name)}</div>
+                  <div class="chore-card-amount">+${formatMoney(t.amount)}</div>
+                  <div class="chore-card-after">→ ${formatMoney(balance + t.amount)}</div>
+                  ${t.autoApprove ? '<div class="chore-auto-badge">⚡ Instant credit</div>' : ''}
+                  <button class="chore-done-btn secondary" onclick="addChoreFromTemplate('${sanitizeId(t.id)}')">+ Add</button>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      })()}
     `;
   }
 
@@ -1563,6 +1587,10 @@ function renderChoresPage() {
             <div class="chore-template-info">
               <span class="chore-template-name">${escapeHtml(t.name)}</span>
               <span class="chore-template-amount">+${formatMoney(t.amount)}</span>
+              <div class="chore-template-flags">
+                <button class="chore-flag-btn ${t.kidCanAdd ? 'active' : ''}" onclick="toggleTemplateFlag('${sanitizeId(t.id)}', 'kidCanAdd')" title="Kids can self-add">🧒 Self-add</button>
+                <button class="chore-flag-btn ${t.autoApprove ? 'active' : ''}" onclick="toggleTemplateFlag('${sanitizeId(t.id)}', 'autoApprove')" title="Auto-approve on completion">⚡ Auto-approve</button>
+              </div>
             </div>
             <div class="chore-template-actions">
               <button class="chore-template-add-btn" onclick="openChoreModalWithSuggestion('${escapeHtml(t.name)}', ${t.amount})">+ Add</button>
@@ -1749,6 +1777,27 @@ function renderTemplateModal() {
         <div class="form-group">
           <label>Suggested payment</label>
           <input type="number" id="templateAmount" placeholder="0.00" step="0.01" min="0.01" inputmode="decimal" value="${t ? (t.amount / 100).toFixed(2) : ''}">
+        </div>
+        <div class="form-group">
+          <label>Permissions</label>
+          <div class="toggle-row">
+            <label class="toggle-label">
+              <input type="checkbox" id="templateKidCanAdd" ${t && t.kidCanAdd ? 'checked' : ''}>
+              <span class="toggle-text">
+                <strong>🧒 Kids can self-add</strong>
+                <small>Kids can add this chore to their own list — still needs approval when done</small>
+              </span>
+            </label>
+          </div>
+          <div class="toggle-row">
+            <label class="toggle-label">
+              <input type="checkbox" id="templateAutoApprove" ${t && t.autoApprove ? 'checked' : ''}>
+              <span class="toggle-text">
+                <strong>⚡ Auto-approve</strong>
+                <small>Credit is applied immediately when kid marks it done — no parent review needed</small>
+              </span>
+            </label>
+          </div>
         </div>
         <button class="submit-btn green" onclick="submitTemplate()">${t ? 'Save Changes' : 'Add Template'}</button>
       </div>
@@ -2201,20 +2250,31 @@ window.openEditTemplateModal = function(id) {
 window.submitTemplate = function() {
   const name = document.getElementById('templateName').value.trim();
   const amount = parseMoney(document.getElementById('templateAmount').value);
+  const kidCanAdd = document.getElementById('templateKidCanAdd').checked;
+  const autoApprove = document.getElementById('templateAutoApprove').checked;
   if (!name) { shakeElement('templateName'); return; }
   if (!amount) { shakeElement('templateAmount'); return; }
   if (!state.choreTemplates) state.choreTemplates = getChoreTemplates();
   const templates = state.choreTemplates;
   if (editingTemplateId) {
     const t = templates.find(t => t.id === editingTemplateId);
-    if (t) { t.name = name; t.amount = amount; }
+    if (t) { t.name = name; t.amount = amount; t.kidCanAdd = kidCanAdd; t.autoApprove = autoApprove; }
     editingTemplateId = null;
   } else {
-    templates.push({ id: generateId(), name, amount });
+    templates.push({ id: generateId(), name, amount, kidCanAdd, autoApprove });
   }
   state.choreTemplates = templates;
   saveData(state);
   modalOpen = null;
+  render();
+};
+
+window.toggleTemplateFlag = function(id, flag) {
+  if (!state.choreTemplates) state.choreTemplates = getChoreTemplates();
+  const t = state.choreTemplates.find(t => t.id === id);
+  if (!t) return;
+  t[flag] = !t[flag];
+  saveData(state);
   render();
 };
 
@@ -2288,8 +2348,47 @@ window.openEditChoreModal = function(id) {
 window.markChoreDone = function(id) {
   const chore = (state.chores || []).find(c => c.id === id);
   if (!chore || chore.status !== 'available') return;
-  chore.status = 'pending';
-  chore.completedAt = Date.now();
+  // Check if the source template has auto-approve
+  const template = getChoreTemplates().find(t => t.name === chore.name && t.autoApprove);
+  if (template) {
+    // Auto-approve: create transaction immediately
+    state.transactions.push({
+      id: generateId(),
+      kidId: chore.kidId,
+      type: 'income',
+      amount: chore.amount,
+      description: chore.name,
+      timestamp: Date.now(),
+      createdBy: 'chore-auto',
+    });
+    chore.status = 'approved';
+    chore.approvedAt = Date.now();
+  } else {
+    chore.status = 'pending';
+    chore.completedAt = Date.now();
+  }
+  saveData(state);
+  render();
+};
+
+window.addChoreFromTemplate = function(templateId) {
+  const template = getChoreTemplates().find(t => t.id === templateId);
+  if (!template) return;
+  const kid = getActiveKid();
+  if (!kid) return;
+  if (!state.chores) state.chores = [];
+  // Prevent duplicate active chores with same name
+  const alreadyActive = state.chores.some(c => c.kidId === kid.id && c.name === template.name && (c.status === 'available' || c.status === 'pending'));
+  if (alreadyActive) return;
+  state.chores.push({
+    id: generateId(),
+    kidId: kid.id,
+    name: template.name,
+    amount: template.amount,
+    repeating: false,
+    status: 'available',
+    createdAt: Date.now(),
+  });
   saveData(state);
   render();
 };

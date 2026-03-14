@@ -1863,10 +1863,40 @@ body {
 
 .chore-template-info {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 4px;
   flex: 1;
   min-width: 0;
+}
+
+.chore-template-info > span {
+  display: inline;
+}
+
+.chore-template-flags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+.chore-flag-btn {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+
+.chore-flag-btn.active {
+  background: var(--purple);
+  color: white;
+  border-color: var(--purple);
 }
 
 .chore-template-name {
@@ -2004,6 +2034,58 @@ body {
 .chore-card.do-again {
   border: 2px solid var(--purple);
   opacity: 0.9;
+}
+
+.chore-card.add-from-template {
+  border: 2px dashed var(--text-muted);
+  opacity: 0.9;
+}
+
+.chore-auto-badge {
+  font-size: 11px;
+  color: var(--yellow);
+  font-weight: 600;
+}
+
+.chore-done-btn.secondary {
+  background: var(--bg-secondary);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.toggle-row {
+  margin-bottom: 10px;
+}
+
+.toggle-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.toggle-label input[type="checkbox"] {
+  margin-top: 3px;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--purple);
+}
+
+.toggle-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.toggle-text strong {
+  font-size: 14px;
+}
+
+.toggle-text small {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
 }
 
 .chore-card-icon {
