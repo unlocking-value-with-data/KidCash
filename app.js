@@ -609,6 +609,24 @@ function parseProductFromHtml(html, url) {
   return result;
 }
 
+// ─── SVG Icon Helper ──────────────────────────────────────────
+function svgIcon(paths, size = 20) {
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
+}
+const SVG = {
+  inbox:    `<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>`,
+  target:   `<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>`,
+  star:     `<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>`,
+  repeat:   `<polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>`,
+  checkSq:  `<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>`,
+  broom:    `<path d="M9 6 6.5 3.5a1.5 1.5 0 0 0-1-.5C4 3 4 3.5 4 4v4.5l2.5 2.5"/><path d="m12 15 4.5 4.5"/><path d="M15 12l4.5-4.5"/><path d="m6.5 8.5 5 5"/><path d="m9 6 2 2"/><path d="M10.5 7.5 15 3"/><path d="M17 10l-1.5 1.5"/><path d="m11 17 2-2"/><path d="M9.9 9.9 3 17l-.5 3.5 3.5-.5L13 13"/>`,
+  dollar:   `<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>`,
+  cart:     `<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>`,
+  arrowUp:  `<line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>`,
+  arrowDn:  `<line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>`,
+  warning:  `<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>`,
+};
+
 // ─── Category Icons ───────────────────────────────────────────
 const CATEGORIES = {
   income: [
@@ -952,7 +970,7 @@ function renderChoresSnapshot(kid, balance) {
     return `
       <div class="section" onclick="navigateTo('chores')" style="cursor:pointer">
         <div class="section-header">
-          <h3 class="section-title">🧹 Chores</h3>
+          <h3 class="section-title">Chores</h3>
           <button class="section-link" onclick="event.stopPropagation();navigateTo('chores')">See All</button>
         </div>
         <div class="transaction-list">
@@ -960,7 +978,7 @@ function renderChoresSnapshot(kid, balance) {
             const isPending = c.status === 'pending';
             return `
               <div class="transaction-item${isPending ? ' chore-pending-item' : ''}">
-                <div class="tx-icon income">🧹</div>
+                <div class="tx-icon income">${svgIcon(SVG.broom)}</div>
                 <div class="tx-details">
                   <div class="tx-description">${escapeHtml(c.name)}</div>
                   <div class="tx-date">${isPending ? '⏳ Awaiting approval' : `→ ${formatMoney(balance + c.amount)} after`}</div>
@@ -980,7 +998,7 @@ function renderChoresSnapshot(kid, balance) {
     return `
       <div class="section" onclick="navigateTo('chores')" style="cursor:pointer">
         <div class="section-header">
-          <h3 class="section-title">🧹 Chores${pending.length > 0 ? ` <span class="approval-badge">${pending.length}</span>` : ''}</h3>
+          <h3 class="section-title">Chores${pending.length > 0 ? ` <span class="approval-badge">${pending.length}</span>` : ''}</h3>
           <button class="section-link" onclick="event.stopPropagation();navigateTo('chores')">See All</button>
         </div>
         <div class="transaction-list">
@@ -990,7 +1008,7 @@ function renderChoresSnapshot(kid, balance) {
             const isPending = c.status === 'pending';
             return `
               <div class="transaction-item${isPending ? ' chore-pending-item' : ''}">
-                <div class="tx-icon income">🧹</div>
+                <div class="tx-icon income">${svgIcon(SVG.broom)}</div>
                 <div class="tx-details">
                   <div class="tx-description">${escapeHtml(c.name)}</div>
                   <div class="tx-date">${kidName}${isPending ? ' · ⏳ Needs approval' : ''}</div>
@@ -1125,8 +1143,9 @@ function renderRecentActivitySnapshot(transactions) {
         </div>
       ` : `
         <div class="empty-state">
-          <div class="empty-icon">📭</div>
-          <p>No transactions yet. Add some money to get started!</p>
+          <div class="empty-icon">${svgIcon(SVG.inbox, 26)}</div>
+          <p>No transactions yet</p>
+          <p>Add some money to get started!</p>
         </div>
       `}
     </div>
@@ -1141,7 +1160,7 @@ function renderKidChoresSnapshot(chores) {
   return `
     <div class="section">
       <div class="section-header">
-        <h3 class="section-title">🧹 My Chores</h3>
+        <h3 class="section-title">My Chores</h3>
       </div>
       <div class="chore-list">
         ${available.map(c => `
@@ -1207,7 +1226,7 @@ function renderActivityPage() {
     ${isInKidMode() ? '' : `
       <div class="activity-tabs">
         <button class="activity-tab ${activityTab === 'history' ? 'active' : ''}" onclick="setActivityTab('history')">History</button>
-        <button class="activity-tab ${activityTab === 'recurring' ? 'active' : ''}" onclick="setActivityTab('recurring')">🔁 Recurring</button>
+        <button class="activity-tab ${activityTab === 'recurring' ? 'active' : ''}" onclick="setActivityTab('recurring')">Recurring</button>
       </div>
     `}
     ${activityTab === 'recurring' && !isInKidMode() ? renderRecurringView(kid) : renderHistoryView(kid)}
@@ -1227,8 +1246,9 @@ function renderHistoryView(kid) {
       </div>
     ` : `
       <div class="empty-state">
-        <div class="empty-icon">📭</div>
-        <p>No transactions yet for ${escapeHtml(kid.name)}.</p>
+        <div class="empty-icon">${svgIcon(SVG.inbox, 26)}</div>
+        <p>No transactions yet</p>
+        <p>All of ${escapeHtml(kid.name)}'s money activity will appear here.</p>
       </div>
     `}
   `;
@@ -1243,8 +1263,8 @@ function renderRecurringView(kid) {
     </div>
     ${recurring.length === 0 ? `
       <div class="empty-state">
-        <div class="empty-icon">🔁</div>
-        <p>No recurring activities yet.</p>
+        <div class="empty-icon">${svgIcon(SVG.repeat, 26)}</div>
+        <p>No recurring activities</p>
         <p style="font-size:14px;color:var(--text-secondary);margin-top:8px">Set up allowance, subscriptions, or any regular income or expense that should happen automatically.</p>
       </div>
     ` : `
@@ -1299,7 +1319,7 @@ function renderGoalsPage() {
         </div>
       ` : `
         <div class="empty-state">
-          <div class="empty-icon">🎯</div>
+          <div class="empty-icon">${svgIcon(SVG.target, 26)}</div>
           <p>No saving goals yet. Create one to start tracking!</p>
         </div>
       `}
@@ -1315,7 +1335,7 @@ function renderGoalsPage() {
         </div>
       ` : `
         <div class="empty-state">
-          <div class="empty-icon">✨</div>
+          <div class="empty-icon">${svgIcon(SVG.star, 26)}</div>
           <p>No wishlist items yet. Paste a product link to add one!</p>
         </div>
       `}
@@ -1675,7 +1695,7 @@ function renderSettingsPage() {
       <label class="settings-section-label">Account</label>
       <p class="settings-user-email">Signed in as ${escapeHtml(currentUser?.email || 'Unknown')}</p>
       ${currentUser?.email && !currentUser?.emailVerified && currentUser?.providerData?.[0]?.providerId === 'password'
-        ? '<div class="email-verify-warning">⚠️ Email not verified. <button onclick="handleResendVerification()">Resend verification email</button></div>'
+        ? `<div class="email-verify-warning">${svgIcon(SVG.warning, 16)} Email not verified. <button onclick="handleResendVerification()">Resend verification email</button></div>`
         : ''}
       <button class="signout-btn" onclick="handleSignOut()">Sign Out</button>
     </div>
@@ -1713,7 +1733,7 @@ function renderGoalCard(goal, balance) {
 function renderTransaction(t) {
   const icon = getCategoryIcon(t.type, t.category);
   const taxInfo = t.tax ? `<span class="tx-tax">incl. ${formatMoney(t.tax)} tax (${escapeHtml(t.taxState || '')})</span>` : '';
-  const createdByBadge = t.createdBy ? `<span class="tx-created-by tx-created-by--${t.createdBy}">${t.createdBy === 'kid' ? '👧 Kid' : '👤 Parent'}</span>` : '';
+  const createdByBadge = t.createdBy ? `<span class="tx-created-by tx-created-by--${t.createdBy}">${t.createdBy === 'kid' ? 'Kid' : 'Parent'}</span>` : '';
   return `
     <div class="transaction-item">
       <div class="tx-icon ${t.type}">${icon}</div>
@@ -1744,8 +1764,8 @@ function renderWishlistCard(item, balance) {
         </div>
       </div>
       <div class="wishlist-actions">
-        <button class="wishlist-action-btn goal" onclick="wishlistToGoal('${sanitizeId(item.id)}')">🎯 Set Goal</button>
-        <button class="wishlist-action-btn buy" onclick="wishlistToPurchase('${sanitizeId(item.id)}')">🛒 Buy</button>
+        <button class="wishlist-action-btn goal" onclick="wishlistToGoal('${sanitizeId(item.id)}')">Set Goal</button>
+        <button class="wishlist-action-btn buy" onclick="wishlistToPurchase('${sanitizeId(item.id)}')">Buy</button>
         <button class="wishlist-action-btn delete" onclick="confirmDeleteWishlistItem('${sanitizeId(item.id)}')">Remove</button>
       </div>
     </div>
@@ -1859,8 +1879,8 @@ function renderRecurringModal() {
           </select>
         </div>
         <div class="type-toggle">
-          <button id="recurringTypeIncome" class="${activeType === 'income' ? 'active-income' : ''}" onclick="setRecurringType('income')">💵 Add Money</button>
-          <button id="recurringTypeExpense" class="${activeType === 'expense' ? 'active-expense' : ''}" onclick="setRecurringType('expense')">🛒 Spending</button>
+          <button id="recurringTypeIncome" class="${activeType === 'income' ? 'active-income' : ''}" onclick="setRecurringType('income')">Add Money</button>
+          <button id="recurringTypeExpense" class="${activeType === 'expense' ? 'active-expense' : ''}" onclick="setRecurringType('expense')">Spending</button>
         </div>
         <div class="form-group">
           <label>Amount</label>
