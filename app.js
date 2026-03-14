@@ -955,7 +955,7 @@ function renderChoresSnapshot(kid, balance) {
           <h3 class="section-title">🧹 Chores</h3>
           <button class="section-link" onclick="event.stopPropagation();navigateTo('chores')">See All</button>
         </div>
-        <div class="transactions-list">
+        <div class="transaction-list">
           ${items.map(c => {
             const isPending = c.status === 'pending';
             return `
@@ -983,7 +983,7 @@ function renderChoresSnapshot(kid, balance) {
           <h3 class="section-title">🧹 Chores${pending.length > 0 ? ` <span class="approval-badge">${pending.length}</span>` : ''}</h3>
           <button class="section-link" onclick="event.stopPropagation();navigateTo('chores')">See All</button>
         </div>
-        <div class="transactions-list">
+        <div class="transaction-list">
           ${items.map(c => {
             const choreKid = state.kids.find(k => k.id === c.kidId);
             const kidName = choreKid ? escapeHtml(choreKid.name) : 'Unknown';
