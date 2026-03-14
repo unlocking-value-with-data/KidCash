@@ -627,30 +627,134 @@ const SVG = {
   warning:  `<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>`,
 };
 
+// ─── Kid Avatars ──────────────────────────────────────────────
+function kidAvatarColor(name) {
+  const palette = ['#6C5CE7','#00A878','#0984E3','#E17055','#8E44AD','#00838F','#D35400','#1E8449'];
+  let h = 0;
+  for (const c of (name || '')) h = (h * 31 + c.charCodeAt(0)) & 0xffff;
+  return palette[h % palette.length];
+}
+
+function kidAvatarHtml(name, size = 36) {
+  const color = kidAvatarColor(name);
+  const initials = name.trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  const fontSize = Math.round(size * 0.38);
+  return `<div class="kid-avatar-circle" style="width:${size}px;height:${size}px;background:${color};font-size:${fontSize}px">${initials}</div>`;
+}
+
+function progressRing(percent, size = 52) {
+  const r = (size - 7) / 2;
+  const circ = +(2 * Math.PI * r).toFixed(2);
+  const offset = +(circ * (1 - Math.min(100, percent) / 100)).toFixed(2);
+  const color = percent >= 100 ? 'var(--green)' : 'var(--purple)';
+  const textColor = percent >= 100 ? 'var(--green)' : 'var(--purple)';
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="flex-shrink:0" aria-hidden="true">
+    <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="var(--border)" stroke-width="3.5"/>
+    <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${color}" stroke-width="3.5"
+      stroke-dasharray="${circ}" stroke-dashoffset="${offset}"
+      stroke-linecap="round" transform="rotate(-90 ${size/2} ${size/2})"/>
+    <text x="${size/2}" y="${size/2}" text-anchor="middle" dominant-baseline="central"
+      font-size="${Math.round(size * 0.21)}px" font-weight="700" fill="${textColor}" font-family="inherit">${percent}%</text>
+  </svg>`;
+}
+
+function emptyStateIllustration(type) {
+  const w = 72, h = 72;
+  const illustrations = {
+    transactions: `<svg width="${w}" height="${h}" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="72" height="72" rx="18" fill="var(--purple-faint)"/>
+      <ellipse cx="36" cy="42" rx="16" ry="13" fill="white" stroke="var(--purple)" stroke-width="1.5"/>
+      <circle cx="47" cy="35" rx="7" ry="7" fill="white" stroke="var(--purple)" stroke-width="1.5"/>
+      <ellipse cx="49" cy="38" rx="3.5" ry="2.5" fill="var(--purple-faint)" stroke="var(--purple)" stroke-width="1"/>
+      <circle cx="48" cy="32" r="1" fill="var(--purple)"/>
+      <rect x="31" y="25" width="6" height="1.5" rx="0.75" fill="var(--purple)" opacity="0.5"/>
+      <path d="M20 42 Q15 39 15 44 Q15 49 20 47" stroke="var(--purple)" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+      <line x1="29" y1="54" x2="28" y2="59" stroke="var(--purple)" stroke-width="1.5" stroke-linecap="round"/>
+      <line x1="43" y1="54" x2="44" y2="59" stroke="var(--purple)" stroke-width="1.5" stroke-linecap="round"/>
+      <circle cx="56" cy="20" r="5" fill="var(--yellow-faint)" stroke="var(--yellow)" stroke-width="1.5"/>
+      <line x1="56" y1="17" x2="56" y2="23" stroke="var(--yellow)" stroke-width="1.5" stroke-linecap="round"/>
+      <line x1="53" y1="20" x2="59" y2="20" stroke="var(--yellow)" stroke-width="1" stroke-linecap="round"/>
+    </svg>`,
+    goals: `<svg width="${w}" height="${h}" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="72" height="72" rx="18" fill="var(--purple-faint)"/>
+      <path d="M36 52 Q30 44 20 40 Q28 36 36 20 Q44 36 52 40 Q42 44 36 52Z" fill="white" stroke="var(--purple)" stroke-width="1.5" stroke-linejoin="round"/>
+      <circle cx="36" cy="38" r="5" fill="var(--purple-faint)" stroke="var(--purple)" stroke-width="1.5"/>
+      <circle cx="36" cy="38" r="2" fill="var(--purple)"/>
+      <line x1="36" y1="52" x2="36" y2="60" stroke="var(--purple)" stroke-width="1.5" stroke-linecap="round"/>
+      <line x1="30" y1="60" x2="42" y2="60" stroke="var(--purple)" stroke-width="2" stroke-linecap="round"/>
+    </svg>`,
+    wishlist: `<svg width="${w}" height="${h}" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="72" height="72" rx="18" fill="var(--purple-faint)"/>
+      <path d="M24 28 L20 20 H16" stroke="var(--purple)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M24 28 L28 44 H52 L56 28 Z" fill="white" stroke="var(--purple)" stroke-width="1.5" stroke-linejoin="round"/>
+      <circle cx="30" cy="50" r="3" fill="var(--purple-faint)" stroke="var(--purple)" stroke-width="1.5"/>
+      <circle cx="48" cy="50" r="3" fill="var(--purple-faint)" stroke="var(--purple)" stroke-width="1.5"/>
+      <path d="M36 22 L37.8 27.5 H43.5 L38.9 30.8 L40.7 36.3 L36 33 L31.3 36.3 L33.1 30.8 L28.5 27.5 H34.2 Z" fill="var(--yellow-faint)" stroke="var(--yellow)" stroke-width="1" stroke-linejoin="round"/>
+    </svg>`,
+    recurring: `<svg width="${w}" height="${h}" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="72" height="72" rx="18" fill="var(--purple-faint)"/>
+      <rect x="16" y="22" width="40" height="34" rx="6" fill="white" stroke="var(--purple)" stroke-width="1.5"/>
+      <line x1="16" y1="31" x2="56" y2="31" stroke="var(--purple)" stroke-width="1.5"/>
+      <line x1="26" y1="16" x2="26" y2="26" stroke="var(--purple)" stroke-width="2" stroke-linecap="round"/>
+      <line x1="46" y1="16" x2="46" y2="26" stroke="var(--purple)" stroke-width="2" stroke-linecap="round"/>
+      <path d="M28 44 Q36 38 44 44" stroke="var(--purple)" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+      <polyline points="42 41 44 44 41 46" stroke="var(--purple)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>`,
+    chores: `<svg width="${w}" height="${h}" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="72" height="72" rx="18" fill="var(--purple-faint)"/>
+      <rect x="18" y="16" width="36" height="44" rx="6" fill="white" stroke="var(--purple)" stroke-width="1.5"/>
+      <rect x="28" y="12" width="16" height="8" rx="4" fill="var(--purple)" opacity="0.7"/>
+      <line x1="28" y1="30" x2="44" y2="30" stroke="var(--border)" stroke-width="1.5" stroke-linecap="round"/>
+      <line x1="28" y1="38" x2="44" y2="38" stroke="var(--border)" stroke-width="1.5" stroke-linecap="round"/>
+      <line x1="28" y1="46" x2="38" y2="46" stroke="var(--border)" stroke-width="1.5" stroke-linecap="round"/>
+      <path d="M24 29 L26 31 L30 27" stroke="var(--green)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M24 37 L26 39 L30 35" stroke="var(--green)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>`,
+  };
+  return illustrations[type] || illustrations.transactions;
+}
+
 // ─── Category Icons ───────────────────────────────────────────
+const CAT_ICON_PATHS = {
+  'cash':       `<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>`,
+  'gift-card':  `<polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>`,
+  'allowance':  `<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>`,
+  'birthday':   `<path d="M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8"/><path d="M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2 1 2 1"/><line x1="12" y1="11" x2="12" y2="3"/><path d="m9.5 3 2.5 3 2.5-3"/>`,
+  'chores':     `<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>`,
+  'other-in':   `<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>`,
+  'toy':        `<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>`,
+  'game':       `<line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/><line x1="15" y1="13" x2="15.01" y2="13"/><line x1="18" y1="11" x2="18.01" y2="11"/><rect x="2" y="6" width="20" height="12" rx="2"/>`,
+  'food':       `<path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/>`,
+  'clothes':    `<path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.57a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.57a2 2 0 0 0-1.34-2.23z"/>`,
+  'book':       `<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>`,
+  'other-out':  `<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>`,
+};
+
 const CATEGORIES = {
   income: [
-    { value: 'cash', label: 'Cash', icon: '💵' },
-    { value: 'gift-card', label: 'Gift Card', icon: '🎁' },
-    { value: 'allowance', label: 'Allowance', icon: '📅' },
-    { value: 'birthday', label: 'Birthday Money', icon: '🎂' },
-    { value: 'chores', label: 'Chore Payment', icon: '🧹' },
-    { value: 'other-in', label: 'Other', icon: '💰' },
+    { value: 'cash',      label: 'Cash',           icon: '💵' },
+    { value: 'gift-card', label: 'Gift Card',       icon: '🎁' },
+    { value: 'allowance', label: 'Allowance',       icon: '📅' },
+    { value: 'birthday',  label: 'Birthday Money',  icon: '🎂' },
+    { value: 'chores',    label: 'Chore Payment',   icon: '🧹' },
+    { value: 'other-in',  label: 'Other',           icon: '💰' },
   ],
   expense: [
-    { value: 'toy', label: 'Toy', icon: '🧸' },
-    { value: 'game', label: 'Game', icon: '🎮' },
-    { value: 'food', label: 'Food/Treats', icon: '🍕' },
-    { value: 'clothes', label: 'Clothes', icon: '👕' },
-    { value: 'book', label: 'Book', icon: '📚' },
-    { value: 'other-out', label: 'Other', icon: '🛒' },
+    { value: 'toy',       label: 'Toy',             icon: '🧸' },
+    { value: 'game',      label: 'Game',            icon: '🎮' },
+    { value: 'food',      label: 'Food/Treats',     icon: '🍕' },
+    { value: 'clothes',   label: 'Clothes',         icon: '👕' },
+    { value: 'book',      label: 'Book',            icon: '📚' },
+    { value: 'other-out', label: 'Other',           icon: '🛒' },
   ],
 };
 
 function getCategoryIcon(type, category) {
-  const list = CATEGORIES[type] || CATEGORIES.income;
-  const cat = list.find(c => c.value === category);
-  return cat ? cat.icon : (type === 'income' ? '💰' : '🛒');
+  const paths = CAT_ICON_PATHS[category];
+  if (paths) return svgIcon(paths, 18);
+  return svgIcon(type === 'income'
+    ? `<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>`
+    : `<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>`, 18);
 }
 
 // ─── Navigation ──────────────────────────────────────────────
@@ -801,13 +905,13 @@ function renderPinLockScreen() {
       <div class="pin-lock-screen">
         <div class="pin-lock-card">
           <div class="pin-lock-logo">
-            <h1>💰 KidCash</h1>
+            <h1 class="pin-logo">KidCash</h1>
             <p>Who's using the app?</p>
           </div>
           <div class="pin-kid-buttons">
             ${kidsWithPins.map(kid => `
               <button class="pin-kid-btn" onclick="selectKidForPin(${kid.index})">
-                <span class="pin-kid-avatar">${kid.name.charAt(0).toUpperCase()}</span>
+                ${kidAvatarHtml(kid.name, 52)}
                 <span class="pin-kid-name">${escapeHtml(kid.name)}</span>
               </button>
             `).join('')}
@@ -830,7 +934,7 @@ function renderPinLockScreen() {
       <div class="pin-lock-card">
         <button class="pin-back-btn" onclick="clearPinSelection()">← Back</button>
         <div class="pin-lock-logo">
-          <div class="pin-kid-avatar large">${kid.name.charAt(0).toUpperCase()}</div>
+          ${kidAvatarHtml(kid.name, 64)}
           <p>${escapeHtml(kid.name)}</p>
         </div>
         <div class="pin-dots">${dots}</div>
@@ -1029,9 +1133,15 @@ function renderChoresSnapshot(kid, balance) {
 }
 
 function renderBalanceCard(kid, balance, income, expenses) {
+  const chipSvg = `<svg width="32" height="24" viewBox="0 0 32 24" fill="none"><rect width="32" height="24" rx="4" fill="rgba(255,255,255,0.22)"/><rect y="8" width="32" height="8" fill="rgba(255,255,255,0.07)"/><rect x="12" width="8" height="24" fill="rgba(255,255,255,0.07)"/><rect x="1" y="1" width="13" height="10" rx="1" stroke="rgba(255,255,255,0.35)" stroke-width="0.75" fill="none"/><rect x="18" y="1" width="13" height="10" rx="1" stroke="rgba(255,255,255,0.35)" stroke-width="0.75" fill="none"/><rect x="1" y="13" width="13" height="10" rx="1" stroke="rgba(255,255,255,0.35)" stroke-width="0.75" fill="none"/><rect x="18" y="13" width="13" height="10" rx="1" stroke="rgba(255,255,255,0.35)" stroke-width="0.75" fill="none"/></svg>`;
   return `
     <div class="balance-card">
-      <div class="balance-label">${escapeHtml(kid.name)}'s Balance</div>
+      <div class="balance-card-header">
+        ${chipSvg}
+        <div class="balance-card-name">${escapeHtml(kid.name)}</div>
+        ${kidAvatarHtml(kid.name, 32)}
+      </div>
+      <div class="balance-label">Current Balance</div>
       <div class="balance-amount">${formatMoney(balance)}</div>
       <div class="balance-stats">
         <div class="balance-stat">
@@ -1052,7 +1162,7 @@ function renderQuickActions() {
     <div class="quick-actions">
       ${isInKidMode() ? '' : '<button class="action-btn add" onclick="openTransactionModal(\'income\')">+ Add</button>'}
       <button class="action-btn spend" onclick="openTransactionModal('expense')">- Spend</button>
-      <button class="action-btn goal" onclick="navigateTo('goals')">🎯 Goals</button>
+      <button class="action-btn goal" onclick="navigateTo('goals')">Goals</button>
     </div>
   `;
 }
@@ -1080,16 +1190,15 @@ function renderGoalCardCompact(goal, balance) {
   const remaining = balance - effectiveTarget;
   return `
     <div class="goal-card compact" onclick="navigateTo('goals')">
-      <div class="goal-top">
-        <div class="goal-name">🎯 ${escapeHtml(goal.name)}</div>
-        <div class="goal-amount">${formatMoney(balance)} / ${formatMoney(effectiveTarget)}${tax > 0 ? ' <span class="goal-tax-badge">incl. tax</span>' : ''}</div>
-      </div>
-      <div class="goal-progress-bar">
-        <div class="goal-progress-fill ${isComplete ? 'complete' : ''}" style="width: ${percent}%"></div>
-      </div>
-      <div class="goal-percent">${isComplete ? '🎉 Goal reached!' : `${percent}% saved`}</div>
-      <div class="goal-balance-after ${remaining < 0 ? 'negative' : ''}">
-        ${isComplete ? `${formatMoney(remaining)} left after buying` : `Need ${formatMoney(Math.abs(remaining))} more`}
+      <div class="goal-card-inner">
+        ${progressRing(percent)}
+        <div class="goal-card-text">
+          <div class="goal-name">${escapeHtml(goal.name)}</div>
+          <div class="goal-amount">${formatMoney(balance)} / ${formatMoney(effectiveTarget)}${tax > 0 ? ' <span class="goal-tax-badge">incl. tax</span>' : ''}</div>
+          <div class="goal-balance-after ${remaining < 0 ? 'negative' : ''}">
+            ${isComplete ? `🎉 Goal reached! ${formatMoney(remaining)} left` : `Need ${formatMoney(Math.abs(remaining))} more`}
+          </div>
+        </div>
       </div>
     </div>
   `;
@@ -1143,7 +1252,7 @@ function renderRecentActivitySnapshot(transactions) {
         </div>
       ` : `
         <div class="empty-state">
-          <div class="empty-icon">${svgIcon(SVG.inbox, 26)}</div>
+          ${emptyStateIllustration('transactions')}
           <p>No transactions yet</p>
           <p>Add some money to get started!</p>
         </div>
@@ -1246,7 +1355,7 @@ function renderHistoryView(kid) {
       </div>
     ` : `
       <div class="empty-state">
-        <div class="empty-icon">${svgIcon(SVG.inbox, 26)}</div>
+        ${emptyStateIllustration('transactions')}
         <p>No transactions yet</p>
         <p>All of ${escapeHtml(kid.name)}'s money activity will appear here.</p>
       </div>
@@ -1263,7 +1372,7 @@ function renderRecurringView(kid) {
     </div>
     ${recurring.length === 0 ? `
       <div class="empty-state">
-        <div class="empty-icon">${svgIcon(SVG.repeat, 26)}</div>
+        ${emptyStateIllustration('recurring')}
         <p>No recurring activities</p>
         <p style="font-size:14px;color:var(--text-secondary);margin-top:8px">Set up allowance, subscriptions, or any regular income or expense that should happen automatically.</p>
       </div>
@@ -1319,8 +1428,9 @@ function renderGoalsPage() {
         </div>
       ` : `
         <div class="empty-state">
-          <div class="empty-icon">${svgIcon(SVG.target, 26)}</div>
-          <p>No saving goals yet. Create one to start tracking!</p>
+          ${emptyStateIllustration('goals')}
+          <p>No saving goals yet</p>
+          <p>Create one to start tracking your progress!</p>
         </div>
       `}
     </div>
@@ -1335,8 +1445,9 @@ function renderGoalsPage() {
         </div>
       ` : `
         <div class="empty-state">
-          <div class="empty-icon">${svgIcon(SVG.star, 26)}</div>
-          <p>No wishlist items yet. Paste a product link to add one!</p>
+          ${emptyStateIllustration('wishlist')}
+          <p>Nothing on the wishlist yet</p>
+          <p>Paste a product link to add one!</p>
         </div>
       `}
     </div>
@@ -1711,17 +1822,17 @@ function renderGoalCard(goal, balance) {
   const remaining = balance - effectiveTarget;
   return `
     <div class="goal-card">
-      <div class="goal-top">
-        <div class="goal-name">🎯 ${escapeHtml(goal.name)}</div>
-        <div class="goal-amount">${formatMoney(balance)} / ${formatMoney(effectiveTarget)}</div>
-      </div>
-      ${tax > 0 ? `<div class="goal-tax-note">Includes ${formatMoney(tax)} tax (${STATE_TAX_RATES[selectedState]?.rate}%)</div>` : ''}
-      <div class="goal-progress-bar">
-        <div class="goal-progress-fill ${isComplete ? 'complete' : ''}" style="width: ${percent}%"></div>
-      </div>
-      <div class="goal-percent">${isComplete ? '🎉 Goal reached!' : `${percent}% saved`}</div>
-      <div class="goal-balance-after ${remaining < 0 ? 'negative' : ''}">
-        ${isComplete ? `${formatMoney(remaining)} left after buying` : `Need ${formatMoney(Math.abs(remaining))} more`}
+      <div class="goal-card-inner">
+        ${progressRing(percent, 60)}
+        <div class="goal-card-text">
+          <div class="goal-name">${escapeHtml(goal.name)}</div>
+          <div class="goal-amount">${formatMoney(balance)} / ${formatMoney(effectiveTarget)}</div>
+          ${tax > 0 ? `<div class="goal-tax-note">Includes ${formatMoney(tax)} tax (${STATE_TAX_RATES[selectedState]?.rate}%)</div>` : ''}
+          <div class="goal-percent">${isComplete ? '🎉 Goal reached!' : `${percent}% saved`}</div>
+          <div class="goal-balance-after ${remaining < 0 ? 'negative' : ''}">
+            ${isComplete ? `${formatMoney(remaining)} left after buying` : `Need ${formatMoney(Math.abs(remaining))} more`}
+          </div>
+        </div>
       </div>
       <div class="goal-actions">
         <button class="goal-action-btn delete" onclick="confirmDeleteGoal('${sanitizeId(goal.id)}')">Remove</button>

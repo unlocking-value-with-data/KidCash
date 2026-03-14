@@ -255,41 +255,72 @@ body {
 .balance-card {
   background: linear-gradient(135deg, var(--purple) 0%, var(--purple-dark) 100%);
   border-radius: var(--radius);
-  padding: 28px 24px;
+  padding: 22px 20px 20px;
   color: white;
   margin-bottom: 20px;
   box-shadow: var(--shadow-lg);
   position: relative;
   overflow: hidden;
 }
+
 .balance-card::before {
   content: '';
   position: absolute;
-  bottom: -40px;
-  left: -20px;
-  width: 140px;
-  height: 140px;
+  bottom: -50px;
+  left: -30px;
+  width: 160px;
+  height: 160px;
   border-radius: 50%;
-  background: rgba(255,255,255,0.05);
-  pointer-events: none;
-}
-.balance-card::after {
-  content: '';
-  position: absolute;
-  top: -30px;
-  right: -30px;
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.04);
   pointer-events: none;
 }
 
+.balance-card::after {
+  content: '';
+  position: absolute;
+  top: -40px;
+  right: -40px;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.06);
+  pointer-events: none;
+}
+
+.balance-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.balance-card-name {
+  font-size: 15px;
+  font-weight: 600;
+  opacity: 0.9;
+  letter-spacing: 0.3px;
+  flex: 1;
+  margin-left: 12px;
+}
+
+.kid-avatar-circle {
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: white;
+  flex-shrink: 0;
+  letter-spacing: -0.5px;
+}
+
 .balance-label {
-  font-size: 14px;
-  opacity: 0.85;
-  margin-bottom: 4px;
+  font-size: 12px;
+  opacity: 0.75;
+  margin-bottom: 2px;
   font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
 }
 
 .balance-amount {
@@ -404,7 +435,7 @@ body {
 .goals-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .goal-card {
@@ -417,6 +448,17 @@ body {
 
 .goal-card.compact {
   cursor: pointer;
+}
+
+.goal-card-inner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.goal-card-text {
+  flex: 1;
+  min-width: 0;
 }
 
 .goal-top {
@@ -517,8 +559,14 @@ body {
   flex-shrink: 0;
 }
 
-.tx-icon.income { background: var(--green-faint); }
-.tx-icon.expense { background: var(--red-faint); }
+.tx-icon svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2;
+}
+
+.tx-icon.income { background: var(--green-faint); color: var(--green); }
+.tx-icon.expense { background: var(--red-faint); color: var(--red); }
 
 .tx-details {
   flex: 1;
@@ -1095,21 +1143,13 @@ body {
 }
 
 .empty-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 16px;
-  background: var(--purple-faint);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--purple);
-  margin-bottom: 4px;
 }
 
 .empty-icon svg {
-  width: 26px;
-  height: 26px;
-  stroke: var(--purple);
+  border-radius: 18px;
 }
 
 .empty-state p {
@@ -1475,6 +1515,13 @@ body {
   font-weight: 800;
   color: var(--purple);
   margin: 0;
+}
+
+.pin-logo {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--purple);
+  letter-spacing: -0.8px;
 }
 
 .pin-lock-logo p {
