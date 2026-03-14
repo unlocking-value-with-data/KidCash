@@ -998,13 +998,18 @@ function renderChoresSnapshot(kid, balance) {
               </div>
             `;
           }).join('')}
-          ${pending.length === 0 ? `
-            <div class="chore-item">
-              <div class="chore-info">
-                <div class="chore-name" style="color:var(--text-muted)">${available.length} active chore${available.length !== 1 ? 's' : ''}</div>
+          ${pending.length === 0 ? available.slice(0, 3).map(c => {
+            const choreKid = state.kids.find(k => k.id === c.kidId);
+            const kidName = choreKid ? escapeHtml(choreKid.name) : 'Unknown';
+            return `
+              <div class="chore-item">
+                <div class="chore-info">
+                  <div class="chore-name">${escapeHtml(c.name)}</div>
+                  <div class="chore-amount">${kidName} · +${formatMoney(c.amount)}</div>
+                </div>
               </div>
-            </div>
-          ` : ''}
+            `;
+          }).join('') : ''}
         </div>
       </div>
     `;
