@@ -992,7 +992,7 @@ function renderGoalCardCompact(goal, balance) {
   const isComplete = percent >= 100;
   const remaining = balance - effectiveTarget;
   return `
-    <div class="goal-card compact">
+    <div class="goal-card compact" onclick="navigateTo('goals')">
       <div class="goal-top">
         <div class="goal-name">🎯 ${escapeHtml(goal.name)}</div>
         <div class="goal-amount">${formatMoney(balance)} / ${formatMoney(effectiveTarget)}${tax > 0 ? ' <span class="goal-tax-badge">incl. tax</span>' : ''}</div>
