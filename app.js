@@ -1401,12 +1401,23 @@ function renderChoresPage() {
 
   if (kidMode) {
     // ── Kid View ──────────────────────────────────────
-    const myChores = allChores.filter(c => c.kidId === kid.id && c.status !== 'approved');
+    const myChores = allChores.filter(c => c.kidId === kid.id);
     const available = myChores.filter(c => c.status === 'available');
     const pending = myChores.filter(c => c.status === 'pending');
     const balance = getBalance(kid.id);
 
-    if (myChores.length === 0) return `
+    // Past approved chores — dedupe by name, keep most recent
+    const approvedMap = new Map();
+    myChores.filter(c => c.status === 'approved').forEach(c => {
+      if (!approvedMap.has(c.name) || c.approvedAt > approvedMap.get(c.name).approvedAt) {
+        approvedMap.set(c.name, c);
+      }
+    });
+    // Only show "do again" for chores not currently active or pending
+    const activeNames = new Set([...available, ...pending].map(c => c.name));
+    const doAgain = [...approvedMap.values()].filter(c => !activeNames.has(c.name));
+
+    if (available.length === 0 && pending.length === 0 && doAgain.length === 0) return `
       ${renderChoreProgressBanner(kid.id)}
       <div class="empty-state" style="margin-top:24px">
         <div class="empty-icon">🧹</div>
@@ -1450,6 +1461,24 @@ function renderChoresPage() {
                 <div class="chore-card-name">${escapeHtml(c.name)}</div>
                 <div class="chore-card-amount">+${formatMoney(c.amount)}</div>
                 <div class="chore-card-status">Awaiting parent approval</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+      ${doAgain.length > 0 ? `
+        <div class="section">
+          <div class="section-header">
+            <h3 class="section-title">Do Again?</h3>
+          </div>
+          <div class="chore-cards">
+            ${doAgain.map(c => `
+              <div class="chore-card do-again">
+                <div class="chore-card-icon">🔄</div>
+                <div class="chore-card-name">${escapeHtml(c.name)}</div>
+                <div class="chore-card-amount">+${formatMoney(c.amount)}</div>
+                <div class="chore-card-after">→ ${formatMoney(balance + c.amount)}</div>
+                <button class="chore-done-btn" onclick="requestChoreAgain('${sanitizeId(c.id)}')">I did it! ✓</button>
               </div>
             `).join('')}
           </div>
@@ -2261,6 +2290,24 @@ window.markChoreDone = function(id) {
   if (!chore || chore.status !== 'available') return;
   chore.status = 'pending';
   chore.completedAt = Date.now();
+  saveData(state);
+  render();
+};
+
+window.requestChoreAgain = function(id) {
+  const original = (state.chores || []).find(c => c.id === id);
+  if (!original) return;
+  if (!state.chores) state.chores = [];
+  state.chores.push({
+    id: generateId(),
+    kidId: original.kidId,
+    name: original.name,
+    amount: original.amount,
+    repeating: false,
+    status: 'pending',
+    completedAt: Date.now(),
+    createdAt: Date.now(),
+  });
   saveData(state);
   render();
 };

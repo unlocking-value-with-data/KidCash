@@ -2001,6 +2001,11 @@ body {
   opacity: 0.8;
 }
 
+.chore-card.do-again {
+  border: 2px solid var(--purple);
+  opacity: 0.9;
+}
+
 .chore-card-icon {
   font-size: 28px;
 }
