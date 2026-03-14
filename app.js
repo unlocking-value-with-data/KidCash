@@ -10,6 +10,7 @@ function getDefaultData() {
     transactions: [],
     goals: [],
     chores: [],
+    choreTemplates: null, // null = use defaults
     recurringActivities: [],
     activeKidIndex: 0,
   };
@@ -24,6 +25,7 @@ function loadData() {
       if (!data.wishlist) data.wishlist = [];
       if (!data.chores) data.chores = [];
       if (!data.recurringActivities) data.recurringActivities = [];
+      // choreTemplates intentionally left as undefined/null — getChoreTemplates() handles defaults
       return data;
     }
   } catch (e) {
@@ -54,6 +56,7 @@ async function writeToFirestore(uid, data) {
     goals: data.goals || [],
     wishlist: data.wishlist || [],
     chores: data.chores || [],
+    choreTemplates: data.choreTemplates || null,
     recurringActivities: data.recurringActivities || [],
     activeKidIndex: data.activeKidIndex || 0,
     updatedAt: data.updatedAt || Date.now(),
@@ -214,6 +217,7 @@ let editingRecurringId = null;
 let choreRepeating = false;
 let chorePrefill = { name: '', amount: '' };
 let editingChoreId = null;
+let editingTemplateId = null;
 let confirmAction = null;
 let pendingWishlistPurchase = null;
 let fetchStatus = null;
@@ -1290,6 +1294,14 @@ const SUGGESTED_CHORES = [
   { name: 'Make bed',            amount: 50 },
 ];
 
+function getChoreTemplates() {
+  if (state.choreTemplates) return state.choreTemplates;
+  // First time: seed from defaults and save
+  state.choreTemplates = SUGGESTED_CHORES.map(s => ({ id: generateId(), name: s.name, amount: s.amount }));
+  saveData(state);
+  return state.choreTemplates;
+}
+
 function renderChoresPage() {
   const kidMode = isInKidMode();
   const kid = getActiveKid();
@@ -1422,12 +1434,21 @@ function renderChoresPage() {
     <div class="section">
       <div class="section-header">
         <h3 class="section-title">Quick Add</h3>
+        <button class="section-link" onclick="openAddTemplateModal()">+ New</button>
       </div>
-      <div class="chore-suggestions">
-        ${SUGGESTED_CHORES.map(s => `
-          <button class="chore-suggestion-chip" onclick="openChoreModalWithSuggestion('${escapeHtml(s.name)}', ${s.amount})">
-            ${escapeHtml(s.name)} <span class="chip-amount">+${formatMoney(s.amount)}</span>
-          </button>
+      <div class="chore-template-list">
+        ${getChoreTemplates().map(t => `
+          <div class="chore-template-row">
+            <div class="chore-template-info">
+              <span class="chore-template-name">${escapeHtml(t.name)}</span>
+              <span class="chore-template-amount">+${formatMoney(t.amount)}</span>
+            </div>
+            <div class="chore-template-actions">
+              <button class="chore-template-add-btn" onclick="openChoreModalWithSuggestion('${escapeHtml(t.name)}', ${t.amount})">+ Add</button>
+              <button class="chore-edit-btn" onclick="openEditTemplateModal('${sanitizeId(t.id)}')">✏️</button>
+              <button class="tx-delete" onclick="confirmDeleteTemplate('${sanitizeId(t.id)}')">✕</button>
+            </div>
+          </div>
         `).join('')}
       </div>
     </div>
@@ -1586,7 +1607,29 @@ function renderModal() {
   if (modalOpen === 'wishlist') return renderWishlistModal();
   if (modalOpen === 'recurring') return renderRecurringModal();
   if (modalOpen === 'chore') return renderChoreModal();
+  if (modalOpen === 'template') return renderTemplateModal();
   return '';
+}
+
+function renderTemplateModal() {
+  const t = editingTemplateId ? getChoreTemplates().find(t => t.id === editingTemplateId) : null;
+  return `
+    <div class="modal-overlay open" onclick="handleOverlayClick(event)">
+      <div class="modal">
+        <div class="modal-handle"></div>
+        <h2>${t ? 'Edit Template' : 'New Template'}</h2>
+        <div class="form-group">
+          <label>Chore name</label>
+          <input type="text" id="templateName" placeholder="e.g., Take out trash" value="${t ? escapeHtml(t.name) : ''}">
+        </div>
+        <div class="form-group">
+          <label>Suggested payment</label>
+          <input type="number" id="templateAmount" placeholder="0.00" step="0.01" min="0.01" inputmode="decimal" value="${t ? (t.amount / 100).toFixed(2) : ''}">
+        </div>
+        <button class="submit-btn green" onclick="submitTemplate()">${t ? 'Save Changes' : 'Add Template'}</button>
+      </div>
+    </div>
+  `;
 }
 
 function renderChoreModal() {
@@ -1905,6 +1948,7 @@ window.closeModal = function() {
   pendingWishlistPurchase = null;
   editingChoreId = null;
   editingRecurringId = null;
+  editingTemplateId = null;
   render();
 };
 
@@ -2014,6 +2058,49 @@ window.submitGoal = function() {
   });
   saveData(state);
   modalOpen = null;
+  render();
+};
+
+window.openAddTemplateModal = function() {
+  editingTemplateId = null;
+  modalOpen = 'template';
+  render();
+  setTimeout(() => { const el = document.getElementById('templateName'); if (el) el.focus(); }, 100);
+};
+
+window.openEditTemplateModal = function(id) {
+  editingTemplateId = id;
+  modalOpen = 'template';
+  render();
+};
+
+window.submitTemplate = function() {
+  const name = document.getElementById('templateName').value.trim();
+  const amount = parseMoney(document.getElementById('templateAmount').value);
+  if (!name) { shakeElement('templateName'); return; }
+  if (!amount) { shakeElement('templateAmount'); return; }
+  const templates = getChoreTemplates();
+  if (editingTemplateId) {
+    const t = templates.find(t => t.id === editingTemplateId);
+    if (t) { t.name = name; t.amount = amount; }
+    editingTemplateId = null;
+  } else {
+    templates.push({ id: generateId(), name, amount });
+  }
+  state.choreTemplates = templates;
+  saveData(state);
+  modalOpen = null;
+  render();
+};
+
+window.confirmDeleteTemplate = function(id) {
+  confirmAction = {
+    message: 'Remove this template from Quick Add?',
+    action: () => {
+      state.choreTemplates = getChoreTemplates().filter(t => t.id !== id);
+      saveData(state);
+    },
+  };
   render();
 };
 

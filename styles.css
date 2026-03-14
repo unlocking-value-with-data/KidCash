@@ -1830,28 +1830,67 @@ body {
   padding: 4px 0;
 }
 
-/* ─── Chore Suggestions ──────────────────────────────────────── */
-.chore-suggestions {
+/* ─── Chore Template List ────────────────────────────────────── */
+.chore-template-list {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.chore-template-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--bg-secondary);
   gap: 8px;
 }
 
-.chore-suggestion-chip {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  padding: 6px 12px;
-  font-size: 14px;
-  cursor: pointer;
-  color: var(--text-primary);
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.chore-template-row:not(:last-child) {
+  margin-bottom: 4px;
 }
 
-.chore-suggestion-chip:active {
-  background: var(--border);
+.chore-template-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.chore-template-name {
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chore-template-amount {
+  font-size: 13px;
+  color: var(--green);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.chore-template-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.chore-template-add-btn {
+  background: var(--purple);
+  color: white;
+  border: none;
+  border-radius: 16px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
 .chip-amount {
