@@ -1947,6 +1947,15 @@ body {
   flex-shrink: 0;
 }
 
+.chore-edit-btn {
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px;
+  opacity: 0.6;
+}
+
 .chore-pending-badge {
   font-size: 12px;
   color: var(--text-secondary);

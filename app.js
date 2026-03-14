@@ -211,6 +211,7 @@ let txType = 'income';
 let recurringType = 'income';
 let choreRepeating = false;
 let chorePrefill = { name: '', amount: '' };
+let editingChoreId = null;
 let confirmAction = null;
 let pendingWishlistPurchase = null;
 let fetchStatus = null;
@@ -1304,7 +1305,10 @@ function renderChoresPage() {
                   <div class="chore-name">${escapeHtml(c.name)}</div>
                   <div class="chore-amount">${kidName} · +${formatMoney(c.amount)}${c.repeating ? ' · Repeating' : ''}</div>
                 </div>
-                <button class="tx-delete" onclick="confirmDeleteChore('${sanitizeId(c.id)}')">✕</button>
+                <div style="display:flex;gap:6px">
+                  <button class="chore-edit-btn" onclick="openEditChoreModal('${sanitizeId(c.id)}')">✏️</button>
+                  <button class="tx-delete" onclick="confirmDeleteChore('${sanitizeId(c.id)}')">✕</button>
+                </div>
               </div>
             `;
           }).join('')}
@@ -1514,32 +1518,38 @@ function renderModal() {
 }
 
 function renderChoreModal() {
+  const editing = editingChoreId !== null;
+  const editChore = editing ? (state.chores || []).find(c => c.id === editingChoreId) : null;
+  const prefillKidId = editChore ? editChore.kidId : (chorePrefill.kidId || '');
+  const prefillName = editChore ? editChore.name : chorePrefill.name;
+  const prefillAmount = editChore ? editChore.amount : chorePrefill.amount;
+  const prefillRepeating = editChore ? editChore.repeating : choreRepeating;
   return `
     <div class="modal-overlay open" onclick="handleOverlayClick(event)">
       <div class="modal">
         <div class="modal-handle"></div>
-        <h2>Add Chore</h2>
+        <h2>${editing ? 'Edit Chore' : 'Add Chore'}</h2>
         <div class="form-group">
           <label>For</label>
           <select id="choreKid">
-            ${state.kids.map(k => `<option value="${escapeHtml(k.id)}">${escapeHtml(k.name)}</option>`).join('')}
+            ${state.kids.map(k => `<option value="${escapeHtml(k.id)}" ${k.id === prefillKidId ? 'selected' : ''}>${escapeHtml(k.name)}</option>`).join('')}
           </select>
         </div>
         <div class="form-group">
           <label>Chore</label>
-          <input type="text" id="choreName" placeholder="e.g., Take out trash" value="${escapeHtml(chorePrefill.name)}">
+          <input type="text" id="choreName" placeholder="e.g., Take out trash" value="${escapeHtml(prefillName)}">
         </div>
         <div class="form-group">
           <label>Payment</label>
-          <input type="number" id="choreAmount" placeholder="0.00" step="0.01" min="0.01" inputmode="decimal" value="${chorePrefill.amount ? (chorePrefill.amount / 100).toFixed(2) : ''}">
+          <input type="number" id="choreAmount" placeholder="0.00" step="0.01" min="0.01" inputmode="decimal" value="${prefillAmount ? (prefillAmount / 100).toFixed(2) : ''}">
         </div>
         <div class="settings-toggle-row" style="margin-bottom:16px">
           <span>Repeating (resets after approval)</span>
-          <button class="toggle-switch" id="choreRepeatingToggle" onclick="toggleChoreRepeating()">
+          <button class="toggle-switch ${prefillRepeating ? 'active' : ''}" id="choreRepeatingToggle" onclick="toggleChoreRepeating()">
             <span class="toggle-knob"></span>
           </button>
         </div>
-        <button class="submit-btn green" onclick="submitChore()">Add Chore</button>
+        <button class="submit-btn green" onclick="submitChore()">${editing ? 'Save Changes' : 'Add Chore'}</button>
       </div>
     </div>
   `;
@@ -1807,13 +1817,14 @@ window.openTransactionModal = function(type) {
 window.openModal = function(type) {
   modalOpen = type;
   if (type === 'recurring') recurringType = 'income';
-  if (type === 'chore') { choreRepeating = false; chorePrefill = { name: '', amount: '' }; }
+  if (type === 'chore') { choreRepeating = false; chorePrefill = { name: '', amount: '' }; editingChoreId = null; }
   render();
 };
 
 window.closeModal = function() {
   modalOpen = null;
   pendingWishlistPurchase = null;
+  editingChoreId = null;
   render();
 };
 
@@ -1946,17 +1957,38 @@ window.submitChore = function() {
   if (!name) { shakeElement('choreName'); return; }
   if (!amount) { shakeElement('choreAmount'); return; }
   if (!state.chores) state.chores = [];
-  state.chores.push({
-    id: generateId(),
-    kidId,
-    name,
-    amount,
-    repeating: choreRepeating,
-    status: 'available',
-    createdAt: Date.now(),
-  });
+  if (editingChoreId) {
+    const chore = state.chores.find(c => c.id === editingChoreId);
+    if (chore) {
+      chore.kidId = kidId;
+      chore.name = name;
+      chore.amount = amount;
+      chore.repeating = choreRepeating;
+    }
+    editingChoreId = null;
+  } else {
+    state.chores.push({
+      id: generateId(),
+      kidId,
+      name,
+      amount,
+      repeating: choreRepeating,
+      status: 'available',
+      createdAt: Date.now(),
+    });
+  }
   saveData(state);
   modalOpen = null;
+  render();
+};
+
+window.openEditChoreModal = function(id) {
+  const chore = (state.chores || []).find(c => c.id === id);
+  if (!chore) return;
+  editingChoreId = id;
+  choreRepeating = chore.repeating || false;
+  chorePrefill = { name: '', amount: '' };
+  modalOpen = 'chore';
   render();
 };
 
