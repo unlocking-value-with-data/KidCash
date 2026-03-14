@@ -1533,7 +1533,7 @@ function renderChoresPage() {
                   <div class="chore-approval-kid">${kidName} · +${formatMoney(c.amount)}</div>
                 </div>
                 <div class="chore-approval-btns">
-                  <button class="chore-approve-btn" onclick="approveChore('${sanitizeId(c.id)}')">✓ Approve</button>
+                  <button class="chore-approve-btn" onclick="approveChore('${sanitizeId(c.id)}')">✓</button>
                   <button class="chore-reject-btn" onclick="rejectChore('${sanitizeId(c.id)}')">✕</button>
                 </div>
               </div>
