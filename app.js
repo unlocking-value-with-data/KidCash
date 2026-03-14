@@ -1225,6 +1225,47 @@ function renderGoalsPage() {
   `;
 }
 
+// ─── Chore Progression ───────────────────────────────────────
+const CHORE_LEVELS = [
+  { level: 1, name: 'Helper',          emoji: '🌱', min: 0,  next: 5  },
+  { level: 2, name: 'Helping Hand',    emoji: '🌿', min: 5,  next: 10 },
+  { level: 3, name: 'Hard Worker',     emoji: '⭐', min: 10, next: 20 },
+  { level: 4, name: 'Super Star',      emoji: '🌟', min: 20, next: 35 },
+  { level: 5, name: 'Chore Champion',  emoji: '🏆', min: 35, next: 50 },
+  { level: 6, name: 'Legend',          emoji: '👑', min: 50, next: null },
+];
+
+function getChoreStats(kidId) {
+  const completed = state.transactions.filter(t =>
+    t.kidId === kidId && t.category === 'chores' && t.type === 'income'
+  ).length;
+  const levelData = CHORE_LEVELS.slice().reverse().find(l => completed >= l.min) || CHORE_LEVELS[0];
+  const nextLevel = CHORE_LEVELS.find(l => l.level === levelData.level + 1) || null;
+  const progress = nextLevel
+    ? Math.round(((completed - levelData.min) / (nextLevel.min - levelData.min)) * 100)
+    : 100;
+  return { completed, levelData, nextLevel, progress };
+}
+
+function renderChoreProgressBanner(kidId) {
+  const { completed, levelData, nextLevel, progress } = getChoreStats(kidId);
+  const remaining = nextLevel ? nextLevel.min - completed : 0;
+  return `
+    <div class="chore-progress-banner">
+      <div class="chore-level-badge">${levelData.emoji} Level ${levelData.level}</div>
+      <div class="chore-level-name">${levelData.name}</div>
+      <div class="chore-progress-bar-wrap">
+        <div class="chore-progress-bar-fill" style="width:${progress}%"></div>
+      </div>
+      <div class="chore-progress-label">
+        ${nextLevel
+          ? `${completed} chores · ${remaining} more to reach <strong>${nextLevel.name}</strong>`
+          : `🎉 Max level! ${completed} chores completed`}
+      </div>
+    </div>
+  `;
+}
+
 // ─── Chores Page ──────────────────────────────────────────────
 const SUGGESTED_CHORES = [
   { name: 'Take out trash',      amount: 100 },
@@ -1259,15 +1300,22 @@ function renderChoresPage() {
     const myChores = allChores.filter(c => c.kidId === kid.id && c.status !== 'approved');
     const available = myChores.filter(c => c.status === 'available');
     const pending = myChores.filter(c => c.status === 'pending');
+    const balance = getBalance(kid.id);
 
     if (myChores.length === 0) return `
-      <div class="empty-state" style="margin-top:48px">
+      ${renderChoreProgressBanner(kid.id)}
+      <div class="empty-state" style="margin-top:24px">
         <div class="empty-icon">🧹</div>
         <p>No chores assigned yet. Ask a parent to add some!</p>
       </div>
     `;
 
     return `
+      ${renderChoreProgressBanner(kid.id)}
+      <div class="chore-balance-row">
+        <span class="chore-balance-label">Your balance</span>
+        <span class="chore-balance-amount">${formatMoney(balance)}</span>
+      </div>
       ${available.length > 0 ? `
         <div class="section">
           <div class="section-header">
@@ -1279,6 +1327,7 @@ function renderChoresPage() {
                 <div class="chore-card-icon">🧹</div>
                 <div class="chore-card-name">${escapeHtml(c.name)}</div>
                 <div class="chore-card-amount">+${formatMoney(c.amount)}</div>
+                <div class="chore-card-after">→ ${formatMoney(balance + c.amount)}</div>
                 <button class="chore-done-btn" onclick="markChoreDone('${sanitizeId(c.id)}')">Done! ✓</button>
               </div>
             `).join('')}
