@@ -209,6 +209,8 @@ let currentView = 'home'; // 'home' | 'activity' | 'goals' | 'settings'
 let modalOpen = null; // null | 'transaction' | 'goal' | 'wishlist' | 'recurring'
 let txType = 'income';
 let recurringType = 'income';
+let activityTab = 'history'; // 'history' | 'recurring'
+let editingRecurringId = null;
 let choreRepeating = false;
 let chorePrefill = { name: '', amount: '' };
 let editingChoreId = null;
@@ -1102,14 +1104,25 @@ function renderPendingApprovalsSnapshot() {
 function renderActivityPage() {
   const kid = getActiveKid();
   if (!kid) return '<p>No kids set up.</p>';
-  const transactions = getKidTransactions(kid.id);
 
+  return `
+    ${isInKidMode() ? '' : `
+      <div class="activity-tabs">
+        <button class="activity-tab ${activityTab === 'history' ? 'active' : ''}" onclick="setActivityTab('history')">History</button>
+        <button class="activity-tab ${activityTab === 'recurring' ? 'active' : ''}" onclick="setActivityTab('recurring')">🔁 Recurring</button>
+      </div>
+    `}
+    ${activityTab === 'recurring' && !isInKidMode() ? renderRecurringView(kid) : renderHistoryView(kid)}
+  `;
+}
+
+function renderHistoryView(kid) {
+  const transactions = getKidTransactions(kid.id);
   return `
     <div class="page-actions">
       ${isInKidMode() ? '' : '<button class="action-btn add" onclick="openTransactionModal(\'income\')">+ Add Money</button>'}
       <button class="action-btn spend" onclick="openTransactionModal('expense')">- Spend</button>
     </div>
-
     ${transactions.length > 0 ? `
       <div class="transaction-list">
         ${transactions.map(t => renderTransaction(t)).join('')}
@@ -1118,6 +1131,47 @@ function renderActivityPage() {
       <div class="empty-state">
         <div class="empty-icon">📭</div>
         <p>No transactions yet for ${escapeHtml(kid.name)}.</p>
+      </div>
+    `}
+  `;
+}
+
+function renderRecurringView(kid) {
+  const recurring = (state.recurringActivities || []).filter(r => r.kidId === kid.id);
+  const freqLabel = f => f === 'weekly' ? 'Weekly' : f === 'biweekly' ? 'Every 2 weeks' : 'Monthly';
+  return `
+    <div class="page-actions">
+      <button class="action-btn add" onclick="openModal('recurring')">+ Add Recurring</button>
+    </div>
+    ${recurring.length === 0 ? `
+      <div class="empty-state">
+        <div class="empty-icon">🔁</div>
+        <p>No recurring activities yet.</p>
+        <p style="font-size:14px;color:var(--text-secondary);margin-top:8px">Set up allowance, subscriptions, or any regular income or expense that should happen automatically.</p>
+      </div>
+    ` : `
+      <div class="recurring-list">
+        ${recurring.map(r => {
+          const icon = getCategoryIcon(r.type, r.category);
+          const nextDate = new Date(r.nextDue).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          return `
+            <div class="recurring-card ${r.active ? '' : 'inactive'}">
+              <div class="recurring-card-icon ${r.type}">${icon}</div>
+              <div class="recurring-card-body">
+                <div class="recurring-card-name">${escapeHtml(r.description)}</div>
+                <div class="recurring-card-meta">${freqLabel(r.frequency)} · ${r.type === 'income' ? '+' : '-'}${formatMoney(r.amount)}</div>
+                <div class="recurring-card-next">${r.active ? `Next: ${nextDate}` : 'Paused'}</div>
+              </div>
+              <div class="recurring-card-actions">
+                <button class="chore-edit-btn" onclick="openEditRecurringModal('${sanitizeId(r.id)}')">✏️</button>
+                <button class="toggle-switch ${r.active ? 'active' : ''}" onclick="toggleRecurringActive('${sanitizeId(r.id)}')">
+                  <span class="toggle-knob"></span>
+                </button>
+                <button class="tx-delete" onclick="confirmDeleteRecurring('${sanitizeId(r.id)}')">✕</button>
+              </div>
+            </div>
+          `;
+        }).join('')}
       </div>
     `}
   `;
@@ -1385,37 +1439,6 @@ function renderSettingsPage() {
     </div>
 
     <div class="settings-section">
-      <label class="settings-section-label">Recurring Activities</label>
-      ${(state.recurringActivities || []).length === 0
-        ? '<p class="settings-about" style="margin-bottom:12px">No recurring activities yet. Add one below.</p>'
-        : (state.recurringActivities || []).map(r => {
-            const kid = state.kids.find(k => k.id === r.kidId);
-            const kidName = kid ? escapeHtml(kid.name) : 'Unknown';
-            const freqLabel = r.frequency === 'weekly' ? 'Weekly' : r.frequency === 'biweekly' ? 'Every 2 weeks' : 'Monthly';
-            const nextDate = new Date(r.nextDue).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            const icon = getCategoryIcon(r.type, r.category);
-            return `
-              <div class="recurring-item ${r.active ? '' : 'inactive'}">
-                <div class="recurring-icon ${r.type}">${icon}</div>
-                <div class="recurring-details">
-                  <div class="recurring-desc">${escapeHtml(r.description)}</div>
-                  <div class="recurring-meta">${kidName} · ${freqLabel} · ${r.type === 'income' ? '+' : '-'}${formatMoney(r.amount)}</div>
-                  <div class="recurring-next">Next: ${nextDate}</div>
-                </div>
-                <div class="recurring-actions">
-                  <button class="toggle-switch ${r.active ? 'active' : ''}" onclick="toggleRecurringActive('${sanitizeId(r.id)}')">
-                    <span class="toggle-knob"></span>
-                  </button>
-                  <button class="remove-kid" onclick="confirmDeleteRecurring('${sanitizeId(r.id)}')">✕</button>
-                </div>
-              </div>
-            `;
-          }).join('')
-      }
-      <button class="add-kid-btn" onclick="openModal('recurring')">+ Add Recurring Activity</button>
-    </div>
-
-    <div class="settings-section">
       <label class="settings-section-label">Default Sales Tax State</label>
       <div class="form-group" style="margin-bottom:0">
         <select id="settingsState" onchange="updateDefaultState(this.value)">
@@ -1556,46 +1579,47 @@ function renderChoreModal() {
 }
 
 function renderRecurringModal() {
-  const incomeCategories = CATEGORIES.income;
-  const expenseCategories = CATEGORIES.expense;
+  const editing = editingRecurringId !== null;
+  const er = editing ? (state.recurringActivities || []).find(r => r.id === editingRecurringId) : null;
+  const activeType = er ? er.type : recurringType;
   return `
     <div class="modal-overlay open" onclick="handleOverlayClick(event)">
       <div class="modal">
         <div class="modal-handle"></div>
-        <h2>Add Recurring Activity</h2>
+        <h2>${editing ? 'Edit Recurring' : 'Add Recurring Activity'}</h2>
         <div class="form-group">
           <label>For</label>
           <select id="recurringKid">
-            ${state.kids.map(k => `<option value="${escapeHtml(k.id)}">${escapeHtml(k.name)}</option>`).join('')}
+            ${state.kids.map(k => `<option value="${escapeHtml(k.id)}" ${er && k.id === er.kidId ? 'selected' : ''}>${escapeHtml(k.name)}</option>`).join('')}
           </select>
         </div>
         <div class="type-toggle">
-          <button id="recurringTypeIncome" class="${recurringType === 'income' ? 'active-income' : ''}" onclick="setRecurringType('income')">💵 Add Money</button>
-          <button id="recurringTypeExpense" class="${recurringType === 'expense' ? 'active-expense' : ''}" onclick="setRecurringType('expense')">🛒 Spending</button>
+          <button id="recurringTypeIncome" class="${activeType === 'income' ? 'active-income' : ''}" onclick="setRecurringType('income')">💵 Add Money</button>
+          <button id="recurringTypeExpense" class="${activeType === 'expense' ? 'active-expense' : ''}" onclick="setRecurringType('expense')">🛒 Spending</button>
         </div>
         <div class="form-group">
           <label>Amount</label>
-          <input type="number" id="recurringAmount" placeholder="0.00" step="0.01" min="0.01" inputmode="decimal">
+          <input type="number" id="recurringAmount" placeholder="0.00" step="0.01" min="0.01" inputmode="decimal" value="${er ? (er.amount / 100).toFixed(2) : ''}">
         </div>
         <div class="form-group">
           <label>Description</label>
-          <input type="text" id="recurringDescription" placeholder="e.g., Weekly allowance">
+          <input type="text" id="recurringDescription" placeholder="e.g., Weekly allowance" value="${er ? escapeHtml(er.description) : ''}">
         </div>
         <div class="form-group">
           <label>Category</label>
           <select id="recurringCategory">
-            ${CATEGORIES[recurringType].map(c => `<option value="${c.value}">${c.icon} ${c.label}</option>`).join('')}
+            ${CATEGORIES[activeType].map(c => `<option value="${c.value}" ${er && c.value === er.category ? 'selected' : ''}>${c.icon} ${c.label}</option>`).join('')}
           </select>
         </div>
         <div class="form-group">
           <label>Frequency</label>
           <select id="recurringFrequency">
-            <option value="weekly">Weekly</option>
-            <option value="biweekly">Every 2 weeks</option>
-            <option value="monthly">Monthly</option>
+            <option value="weekly" ${er && er.frequency === 'weekly' ? 'selected' : ''}>Weekly</option>
+            <option value="biweekly" ${er && er.frequency === 'biweekly' ? 'selected' : ''}>Every 2 weeks</option>
+            <option value="monthly" ${er && er.frequency === 'monthly' ? 'selected' : ''}>Monthly</option>
           </select>
         </div>
-        <button class="submit-btn ${recurringType === 'income' ? 'green' : ''}" id="recurringSubmitBtn" style="${recurringType === 'expense' ? 'background:var(--red)' : ''}" onclick="submitRecurringActivity()">Add Recurring Activity</button>
+        <button class="submit-btn ${activeType === 'income' ? 'green' : ''}" id="recurringSubmitBtn" style="${activeType === 'expense' ? 'background:var(--red)' : ''}" onclick="submitRecurringActivity()">${editing ? 'Save Changes' : 'Add Recurring Activity'}</button>
       </div>
     </div>
   `;
@@ -1804,7 +1828,13 @@ window.switchKid = function(index) {
   if (isInKidMode()) return; // blocked in kid mode
   state.activeKidIndex = index;
   pendingWishlistPurchase = null;
+  activityTab = 'history';
   saveData(state);
+  render();
+};
+
+window.setActivityTab = function(tab) {
+  activityTab = tab;
   render();
 };
 
@@ -1816,7 +1846,7 @@ window.openTransactionModal = function(type) {
 
 window.openModal = function(type) {
   modalOpen = type;
-  if (type === 'recurring') recurringType = 'income';
+  if (type === 'recurring') { recurringType = 'income'; editingRecurringId = null; }
   if (type === 'chore') { choreRepeating = false; chorePrefill = { name: '', amount: '' }; editingChoreId = null; }
   render();
 };
@@ -1825,6 +1855,7 @@ window.closeModal = function() {
   modalOpen = null;
   pendingWishlistPurchase = null;
   editingChoreId = null;
+  editingRecurringId = null;
   render();
 };
 
@@ -2071,25 +2102,47 @@ window.submitRecurringActivity = function() {
   if (!amount) { shakeElement('recurringAmount'); return; }
   if (!kidId) return;
   if (!state.recurringActivities) state.recurringActivities = [];
-  const now = Date.now();
-  // First occurrence fires immediately (nextDue = now), then advance to next period
-  const recurring = {
-    id: generateId(),
-    kidId,
-    type: recurringType,
-    amount,
-    description: description || (recurringType === 'income' ? 'Recurring income' : 'Recurring expense'),
-    category,
-    frequency,
-    nextDue: now,
-    active: true,
-    createdAt: now,
-  };
-  state.recurringActivities.push(recurring);
-  // Process it immediately so the first transaction is added now
-  processRecurringActivities();
-  saveData(state);
+
+  if (editingRecurringId) {
+    const r = state.recurringActivities.find(r => r.id === editingRecurringId);
+    if (r) {
+      r.kidId = kidId;
+      r.type = recurringType;
+      r.amount = amount;
+      r.description = description || (recurringType === 'income' ? 'Recurring income' : 'Recurring expense');
+      r.category = category;
+      r.frequency = frequency;
+    }
+    editingRecurringId = null;
+    saveData(state);
+  } else {
+    const now = Date.now();
+    const recurring = {
+      id: generateId(),
+      kidId,
+      type: recurringType,
+      amount,
+      description: description || (recurringType === 'income' ? 'Recurring income' : 'Recurring expense'),
+      category,
+      frequency,
+      nextDue: now,
+      active: true,
+      createdAt: now,
+    };
+    state.recurringActivities.push(recurring);
+    processRecurringActivities();
+    saveData(state);
+  }
   modalOpen = null;
+  render();
+};
+
+window.openEditRecurringModal = function(id) {
+  const r = (state.recurringActivities || []).find(r => r.id === id);
+  if (!r) return;
+  editingRecurringId = id;
+  recurringType = r.type;
+  modalOpen = 'recurring';
   render();
 };
 

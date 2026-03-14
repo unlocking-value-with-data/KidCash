@@ -1639,6 +1639,98 @@ body {
   transform: translateX(22px);
 }
 
+/* ─── Activity Sub-tabs ──────────────────────────────────────── */
+.activity-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.activity-tab {
+  flex: 1;
+  padding: 9px;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  background: none;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all 0.15s;
+}
+
+.activity-tab.active {
+  border-color: var(--purple);
+  color: var(--purple);
+  background: rgba(108, 92, 231, 0.07);
+}
+
+/* ─── Recurring Cards (Activity tab) ────────────────────────── */
+.recurring-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.recurring-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg-secondary);
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.recurring-card.inactive {
+  opacity: 0.5;
+}
+
+.recurring-card-icon {
+  font-size: 22px;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.recurring-card-icon.income { background: rgba(0, 184, 148, 0.15); }
+.recurring-card-icon.expense { background: rgba(225, 112, 85, 0.15); }
+
+.recurring-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.recurring-card-name {
+  font-weight: 600;
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recurring-card-meta {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.recurring-card-next {
+  font-size: 12px;
+  color: var(--text-light);
+  margin-top: 2px;
+}
+
+.recurring-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 /* ─── Recurring Activities ───────────────────────────────────── */
 .recurring-item {
   display: flex;
