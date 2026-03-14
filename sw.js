@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kidcash-v6';
+const CACHE_NAME = 'kidcash-v7';
 const ASSETS = [
   './',
   './index.html',
@@ -40,17 +40,15 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // For app assets: stale-while-revalidate
+  // Network-first for app assets: always try to get fresh content,
+  // fall back to cache only if offline
   e.respondWith(
-    caches.match(e.request).then((cached) => {
-      const fetchPromise = fetch(e.request).then((response) => {
-        if (response && response.status === 200) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
-        }
-        return response;
-      }).catch(() => cached);
-      return cached || fetchPromise;
-    })
+    fetch(e.request).then((response) => {
+      if (response && response.status === 200) {
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
+      }
+      return response;
+    }).catch(() => caches.match(e.request))
   );
 });
