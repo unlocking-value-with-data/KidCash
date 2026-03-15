@@ -972,7 +972,7 @@ function renderHeader() {
   const titles = {
     home:     null,
     activity: 'Activity',
-    goals:    'Goals & Wishlist',
+    goals:    'Goals & Wishlist',  // kept for header display
     settings: 'Settings',
     chores:   'Chores',
   };
@@ -1433,13 +1433,14 @@ function renderGoalsPage() {
 
   return `
     <div class="page-actions">
-      <button class="action-btn goal" onclick="openModal('goal')">🎯 New Goal</button>
-      <button class="action-btn wishlist-add" onclick="openWishlistModal()">🔗 Add from Web</button>
+      <button class="action-btn goal" onclick="openModal('goal')">+ New Goal</button>
+      <button class="action-btn wishlist-add" onclick="openWishlistModal()">+ Add from Web</button>
     </div>
 
     <div class="section">
-      <div class="section-header">
-        <h3 class="section-title">Saving Goals</h3>
+      <div class="section-header-stack">
+        <h3 class="section-title">Goals</h3>
+        <p class="section-subtitle">Things you're actively saving for</p>
       </div>
       ${goals.length > 0 ? `
         <div class="goals-list">
@@ -1448,15 +1449,16 @@ function renderGoalsPage() {
       ` : `
         <div class="empty-state">
           ${emptyStateIllustration('goals')}
-          <p>No saving goals yet</p>
-          <p>Create one to start tracking your progress!</p>
+          <p>No goals yet</p>
+          <p>Set a goal to start tracking your savings progress.</p>
         </div>
       `}
     </div>
 
     <div class="section">
-      <div class="section-header">
+      <div class="section-header-stack">
         <h3 class="section-title">Wishlist</h3>
+        <p class="section-subtitle">Things on your radar — promote to a goal when you're ready to save</p>
       </div>
       ${wishlist.length > 0 ? `
         <div class="wishlist-list">
@@ -1466,7 +1468,7 @@ function renderGoalsPage() {
         <div class="empty-state">
           ${emptyStateIllustration('wishlist')}
           <p>Nothing on the wishlist yet</p>
-          <p>Paste a product link to add one!</p>
+          <p>Paste a product link to save it here, then promote it to a goal when you're ready.</p>
         </div>
       `}
     </div>
@@ -1854,6 +1856,7 @@ function renderGoalCard(goal, balance) {
         </div>
       </div>
       <div class="goal-actions">
+        ${isComplete ? `<button class="goal-action-btn buy" onclick="goalToPurchase('${sanitizeId(goal.id)}')">🎉 Buy it now</button>` : ''}
         <button class="goal-action-btn delete" onclick="confirmDeleteGoal('${sanitizeId(goal.id)}')">Remove</button>
       </div>
     </div>
@@ -1894,7 +1897,7 @@ function renderWishlistCard(item, balance) {
         </div>
       </div>
       <div class="wishlist-actions">
-        <button class="wishlist-action-btn goal" onclick="wishlistToGoal('${sanitizeId(item.id)}')">Set Goal</button>
+        <button class="wishlist-action-btn goal primary" onclick="wishlistToGoal('${sanitizeId(item.id)}')">→ Start Saving</button>
         <button class="wishlist-action-btn buy" onclick="wishlistToPurchase('${sanitizeId(item.id)}')">Buy</button>
         <button class="wishlist-action-btn delete" onclick="confirmDeleteWishlistItem('${sanitizeId(item.id)}')">Remove</button>
       </div>
@@ -2831,7 +2834,18 @@ window.wishlistToGoal = function(id) {
     name: item.name,
     target: item.price,
   });
+  // Remove from wishlist once promoted to a goal
+  state.wishlist = state.wishlist.filter(w => w.id !== id);
   saveData(state);
+  render();
+};
+
+window.goalToPurchase = function(id) {
+  const goal = (state.goals || []).find(g => g.id === id);
+  if (!goal) return;
+  txType = 'expense';
+  pendingWishlistPurchase = { name: goal.name, price: goal.target, goalId: id };
+  modalOpen = 'transaction';
   render();
 };
 
