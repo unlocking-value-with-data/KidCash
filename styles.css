@@ -416,8 +416,9 @@ body {
 }
 
 .action-btn.goal {
-  background: var(--yellow);
-  color: var(--text);
+  background: var(--purple-faint);
+  color: var(--purple);
+  border: 1.5px solid rgba(108, 92, 231, 0.18);
 }
 
 .action-btn.wishlist-add {
