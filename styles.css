@@ -557,6 +557,11 @@ body {
   color: var(--text-light);
 }
 
+.goal-action-btn.wishlist {
+  color: var(--purple);
+  border-color: rgba(108, 92, 231, 0.25);
+}
+
 .goal-action-btn.delete {
   color: var(--red);
   border-color: var(--red-light);

@@ -1857,6 +1857,7 @@ function renderGoalCard(goal, balance) {
       </div>
       <div class="goal-actions">
         ${isComplete ? `<button class="goal-action-btn buy" onclick="goalToPurchase('${sanitizeId(goal.id)}')">🎉 Buy it now</button>` : ''}
+        <button class="goal-action-btn wishlist" onclick="goalToWishlist('${sanitizeId(goal.id)}')">← Wishlist</button>
         <button class="goal-action-btn delete" onclick="confirmDeleteGoal('${sanitizeId(goal.id)}')">Remove</button>
       </div>
     </div>
@@ -2808,6 +2809,24 @@ window.wishlistToGoal = function(id) {
   });
   // Remove from wishlist once promoted to a goal
   state.wishlist = state.wishlist.filter(w => w.id !== id);
+  saveData(state);
+  render();
+};
+
+window.goalToWishlist = function(id) {
+  const goal = (state.goals || []).find(g => g.id === id);
+  if (!goal) return;
+  const kid = getActiveKid();
+  state.wishlist.push({
+    id: generateId(),
+    kidId: kid.id,
+    name: goal.name,
+    price: goal.target,
+    url: '',
+    image: null,
+    addedAt: Date.now(),
+  });
+  state.goals = state.goals.filter(g => g.id !== id);
   saveData(state);
   render();
 };
