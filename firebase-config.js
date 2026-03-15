@@ -19,6 +19,11 @@
 //     match /users/{userId} {
 //       allow read, write: if request.auth != null && request.auth.uid == userId;
 //     }
+//     // Public wishlists — anyone can read, only signed-in users can write/delete
+//     match /public_wishlists/{token} {
+//       allow read: if true;
+//       allow write, delete: if request.auth != null;
+//     }
 //   }
 // }
 // ───────────────────────────────────────────────────────────────
@@ -26,7 +31,7 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut, sendEmailVerification, sendPasswordResetEmail }
   from 'https://www.gstatic.com/firebasejs/11.4.0/firebase-auth.js';
-import { getFirestore, doc, getDoc, setDoc }
+import { getFirestore, doc, getDoc, setDoc, deleteDoc }
   from 'https://www.gstatic.com/firebasejs/11.4.0/firebase-firestore.js';
 
 const firebaseConfig = {
@@ -57,6 +62,7 @@ window.fbSendPasswordResetEmail = sendPasswordResetEmail;
 window.fbDoc = doc;
 window.fbGetDoc = getDoc;
 window.fbSetDoc = setDoc;
+window.fbDeleteDoc = deleteDoc;
 
 // Signal to app.js that Firebase is ready
 window.dispatchEvent(new Event('firebase-ready'));

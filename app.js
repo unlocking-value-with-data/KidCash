@@ -13,6 +13,7 @@ function getDefaultData() {
     choreTemplates: null, // null = use defaults
     recurringActivities: [],
     activeKidIndex: 0,
+    wishlistShares: {}, // { [kidId]: shareToken }
   };
 }
 
@@ -23,6 +24,7 @@ function loadData() {
       const data = JSON.parse(raw);
       if (!data.goals) data.goals = [];
       if (!data.wishlist) data.wishlist = [];
+      if (!data.wishlistShares) data.wishlistShares = {};
       if (!data.chores) data.chores = [];
       if (!data.recurringActivities) data.recurringActivities = [];
       // choreTemplates intentionally left as undefined/null — getChoreTemplates() handles defaults
@@ -70,9 +72,37 @@ async function writeToFirestore(uid, data) {
     recurringActivities: data.recurringActivities || [],
     activeKidIndex: data.activeKidIndex || 0,
     updatedAt: data.updatedAt || Date.now(),
+    wishlistShares: data.wishlistShares || {},
   };
   if (data.parentPin) payload.parentPin = data.parentPin;
   await fbSetDoc(docRef, payload);
+}
+
+async function syncPublicWishlist(kidId, token) {
+  if (!window.fbSetDoc || !window.firebaseDb || !currentUser) return;
+  const kid = state.kids.find(k => k.id === kidId);
+  if (!kid) return;
+  const wishlist = getKidWishlist(kidId);
+  const docRef = fbDoc(firebaseDb, 'public_wishlists', token);
+  await fbSetDoc(docRef, {
+    kidName: kid.name,
+    items: wishlist.map(w => ({
+      id: w.id,
+      name: w.name,
+      price: w.price,
+      url: w.url || '',
+      image: w.image || null,
+    })),
+    updatedAt: Date.now(),
+    uid: currentUser.uid,
+  });
+}
+
+async function syncAllPublicWishlists() {
+  const shares = state.wishlistShares || {};
+  for (const [kidId, token] of Object.entries(shares)) {
+    try { await syncPublicWishlist(kidId, token); } catch (e) { /* best-effort */ }
+  }
 }
 
 // Schedule a debounced sync (waits 1.5s after last change)
@@ -105,6 +135,7 @@ async function flushToFirestore() {
   _syncInProgress = true;
   try {
     await writeToFirestore(currentUser.uid, state); // use in-memory state, not re-read from localStorage
+    await syncAllPublicWishlists();
     if (syncStatus !== 'ok') {
       syncStatus = 'ok';
       render();
@@ -232,7 +263,7 @@ function processRecurringActivities() {
 // ─── State ────────────────────────────────────────────────────
 let state = loadData();
 let currentView = 'home'; // 'home' | 'activity' | 'goals' | 'settings'
-let modalOpen = null; // null | 'transaction' | 'wishlist' | 'recurring'
+let modalOpen = null; // null | 'transaction' | 'wishlist' | 'wishlist-share' | 'recurring'
 let txType = 'income';
 let recurringType = 'income';
 let activityTab = 'history'; // 'history' | 'recurring'
@@ -243,6 +274,7 @@ let editingChoreId = null;
 let editingTemplateId = null;
 let confirmAction = null;
 let pendingWishlistPurchase = null;
+let shareModalKidId = null;
 let fetchStatus = null;
 let fetchedProduct = { name: '', price: '', image: null };
 
@@ -1455,9 +1487,14 @@ function renderGoalsPage() {
     </div>
 
     <div class="section">
-      <div class="section-header-stack">
-        <h3 class="section-title">Wishlist</h3>
-        <p class="section-subtitle">Things you want — tap "Set as Goal" when you're ready to start saving</p>
+      <div class="section-header-row">
+        <div class="section-header-stack">
+          <h3 class="section-title">Wishlist</h3>
+          <p class="section-subtitle">Things you want — tap "Set as Goal" when you're ready to start saving</p>
+        </div>
+        <button class="wishlist-share-toggle-btn ${(state.wishlistShares || {})[kid.id] ? 'active' : ''}" onclick="openWishlistShare('${sanitizeId(kid.id)}')">
+          ${svgIcon('<path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/>', 15)} ${(state.wishlistShares || {})[kid.id] ? 'Shared' : 'Share'}
+        </button>
       </div>
       ${wishlist.length > 0 ? `
         <div class="wishlist-list">
@@ -1910,6 +1947,7 @@ function renderWishlistCard(item, balance) {
 function renderModal() {
   if (modalOpen === 'transaction') return renderTransactionModal();
   if (modalOpen === 'wishlist') return renderWishlistModal();
+  if (modalOpen === 'wishlist-share') return renderWishlistShareModal();
   if (modalOpen === 'recurring') return renderRecurringModal();
   if (modalOpen === 'chore') return renderChoreModal();
   if (modalOpen === 'template') return renderTemplateModal();
@@ -2136,6 +2174,32 @@ function renderWishlistModal() {
           <input type="number" id="wishlistPrice" placeholder="0.00" step="0.01" min="0.01" inputmode="decimal" ${fetchedProduct.price ? `value="${fetchedProduct.price}"` : ''}>
         </div>
         <button class="submit-btn" onclick="submitWishlistItem()" style="background:var(--purple)">Add to Wishlist</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderWishlistShareModal() {
+  const kidId = shareModalKidId;
+  const kid = state.kids.find(k => k.id === kidId);
+  if (!kid) return '';
+  const token = (state.wishlistShares || {})[kidId];
+  const isShared = !!token;
+  const shareUrl = isShared ? `${window.location.origin}/wishlist.html?id=${token}` : '';
+  return `
+    <div class="modal-overlay open" onclick="handleOverlayClick(event)">
+      <div class="modal">
+        <div class="modal-handle"></div>
+        <h2>Share Wishlist</h2>
+        ${isShared ? `
+          <p class="share-modal-desc">Anyone with this link can see ${escapeHtml(kid.name)}'s wishlist — no login needed.</p>
+          <div class="share-url-box">${escapeHtml(shareUrl)}</div>
+          <button id="copyShareBtn" class="submit-btn" style="background:var(--purple)" onclick="copyShareLink('${escapeHtml(shareUrl)}')">Copy Link</button>
+          <button class="share-stop-btn" onclick="revokeWishlistShare('${sanitizeId(kidId)}')">Stop Sharing</button>
+        ` : `
+          <p class="share-modal-desc">Create a shareable link so family and friends can see ${escapeHtml(kid.name)}'s wishlist. No login needed — perfect for birthdays and holidays!</p>
+          <button class="submit-btn" style="background:var(--purple)" onclick="shareWishlist('${sanitizeId(kidId)}')">Create Share Link</button>
+        `}
       </div>
     </div>
   `;
@@ -2746,6 +2810,49 @@ window.updateDefaultState = function(stateCode) {
 };
 
 // ─── Wishlist Handlers ────────────────────────────────────────
+window.openWishlistShare = function(kidId) {
+  shareModalKidId = kidId;
+  modalOpen = 'wishlist-share';
+  render();
+};
+
+window.shareWishlist = async function(kidId) {
+  if (!currentUser) return;
+  if (!state.wishlistShares) state.wishlistShares = {};
+  let token = state.wishlistShares[kidId];
+  if (!token) {
+    token = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+      .map(b => b.toString(16).padStart(2, '0')).join('');
+    state.wishlistShares[kidId] = token;
+    saveData(state);
+  }
+  try {
+    await syncPublicWishlist(kidId, token);
+  } catch (e) {
+    console.error('Failed to create share:', e);
+  }
+  render();
+};
+
+window.revokeWishlistShare = async function(kidId) {
+  const token = (state.wishlistShares || {})[kidId];
+  if (!token) return;
+  try {
+    await fbDeleteDoc(fbDoc(firebaseDb, 'public_wishlists', token));
+  } catch (e) { /* best-effort */ }
+  delete state.wishlistShares[kidId];
+  saveData(state);
+  modalOpen = null;
+  render();
+};
+
+window.copyShareLink = function(url) {
+  navigator.clipboard.writeText(url).then(() => {
+    const btn = document.getElementById('copyShareBtn');
+    if (btn) { btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = 'Copy Link'; }, 2000); }
+  });
+};
+
 window.openWishlistModal = function() {
   fetchStatus = null;
   fetchedProduct = { name: '', price: '', image: null };
