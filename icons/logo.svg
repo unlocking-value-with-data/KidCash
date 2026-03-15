@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 36" width="140" height="36">
+  <defs>
+    <linearGradient id="markBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7B6CF6"/>
+      <stop offset="100%" stop-color="#4A3CC7"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Icon mark — rounded square -->
+  <rect width="36" height="36" rx="9" fill="url(#markBg)"/>
+
+  <!-- Coin ring -->
+  <circle cx="18" cy="18" r="10" fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.25)" stroke-width="1.2"/>
+
+  <!-- Arrow up -->
+  <line x1="18" y1="23" x2="18" y2="13" stroke="white" stroke-width="2.2" stroke-linecap="round"/>
+  <polyline points="13,17 18,13 23,17" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+  <!-- Wordmark -->
+  <!-- "Kid" — medium weight -->
+  <text x="44" y="25" font-family="'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+        font-size="20" font-weight="600" fill="#6C5CE7" letter-spacing="-0.3">Kid</text>
+  <!-- "Cash" — heavy weight -->
+  <text x="79" y="25" font-family="'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+        font-size="20" font-weight="800" fill="#1A1D2E" letter-spacing="-0.5">Cash</text>
+</svg>

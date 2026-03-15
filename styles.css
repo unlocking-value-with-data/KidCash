@@ -92,10 +92,33 @@ body {
 }
 
 .header h1 {
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.6px;
+}
+
+.header-logo {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.header-logo-text {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.6px;
+  line-height: 1;
+}
+
+.header-logo-kid {
   color: var(--purple);
-  letter-spacing: -0.8px;
+  font-weight: 600;
+}
+
+.header-logo-cash {
+  color: var(--text);
+  font-weight: 800;
 }
 
 .sync-error {

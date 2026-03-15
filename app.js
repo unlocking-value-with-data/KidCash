@@ -955,20 +955,39 @@ function renderPinLockScreen() {
 }
 
 // ─── Shared Components ───────────────────────────────────────
+const LOGO_MARK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" width="28" height="28" style="display:block;flex-shrink:0">
+  <defs>
+    <linearGradient id="lmBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7B6CF6"/>
+      <stop offset="100%" stop-color="#4A3CC7"/>
+    </linearGradient>
+  </defs>
+  <rect width="28" height="28" rx="7" fill="url(#lmBg)"/>
+  <circle cx="14" cy="14" r="7.5" fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.22)" stroke-width="1"/>
+  <line x1="14" y1="18" x2="14" y2="10" stroke="white" stroke-width="2" stroke-linecap="round"/>
+  <polyline points="10,13 14,10 18,13" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>`;
+
 function renderHeader() {
   const titles = {
-    home: 'KidCash',
+    home:     null,
     activity: 'Activity',
-    goals: 'Goals & Wishlist',
+    goals:    'Goals & Wishlist',
     settings: 'Settings',
-    chores: 'Chores',
+    chores:   'Chores',
   };
   const syncIndicator = syncStatus === 'error'
     ? '<span class="sync-error" title="Changes saved locally but not syncing to cloud">⚠️ Offline</span>'
     : '';
+  const title = titles[currentView];
   return `
     <div class="header">
-      <h1>${titles[currentView] || 'KidCash'}</h1>
+      ${title === null ? `
+        <div class="header-logo">
+          ${LOGO_MARK_SVG}
+          <span class="header-logo-text"><span class="header-logo-kid">Kid</span><span class="header-logo-cash">Cash</span></span>
+        </div>
+      ` : `<h1>${title}</h1>`}
       ${syncIndicator}
     </div>
   `;

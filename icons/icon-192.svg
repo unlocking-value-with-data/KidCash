@@ -1,11 +1,35 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#6C5CE7"/>
-      <stop offset="100%" stop-color="#5A4BD1"/>
+      <stop offset="0%" stop-color="#7B6CF6"/>
+      <stop offset="100%" stop-color="#4A3CC7"/>
+    </linearGradient>
+    <linearGradient id="coinShine" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.18)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0.06)"/>
     </linearGradient>
   </defs>
-  <rect width="192" height="192" rx="40" fill="url(#bg)"/>
-  <text x="96" y="115" text-anchor="middle" font-size="90" font-family="-apple-system, sans-serif" font-weight="800" fill="white">$</text>
-  <circle cx="145" cy="50" r="20" fill="rgba(255,255,255,0.15)"/>
+
+  <!-- Background -->
+  <rect width="192" height="192" rx="44" fill="url(#bg)"/>
+
+  <!-- Decorative background circles -->
+  <circle cx="164" cy="34" r="36" fill="rgba(255,255,255,0.055)"/>
+  <circle cx="28" cy="170" r="52" fill="rgba(255,255,255,0.04)"/>
+
+  <!-- Coin outer ring -->
+  <circle cx="96" cy="98" r="54" fill="url(#coinShine)" stroke="rgba(255,255,255,0.22)" stroke-width="2"/>
+
+  <!-- Arrow up — savings growth -->
+  <line x1="96" y1="128" x2="96" y2="68" stroke="white" stroke-width="10" stroke-linecap="round"/>
+  <polyline points="70,91 96,68 122,91" stroke="white" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+  <!-- Two short lines below arrow suggesting stacked coins / value -->
+  <line x1="80" y1="114" x2="112" y2="114" stroke="rgba(255,255,255,0.55)" stroke-width="6" stroke-linecap="round"/>
+  <line x1="86" y1="125" x2="106" y2="125" stroke="rgba(255,255,255,0.30)" stroke-width="5" stroke-linecap="round"/>
+
+  <!-- Sparkle dots top-right -->
+  <circle cx="150" cy="42" r="4.5" fill="rgba(255,255,255,0.55)"/>
+  <circle cx="163" cy="55" r="3" fill="rgba(255,255,255,0.35)"/>
+  <circle cx="156" cy="30" r="2.5" fill="rgba(255,255,255,0.28)"/>
 </svg>
