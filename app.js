@@ -1438,24 +1438,6 @@ function renderGoalsPage() {
 
     <div class="section">
       <div class="section-header-stack">
-        <h3 class="section-title">Wishlist</h3>
-        <p class="section-subtitle">Things you want — tap "Set as Goal" when you're ready to start saving</p>
-      </div>
-      ${wishlist.length > 0 ? `
-        <div class="wishlist-list">
-          ${wishlist.map(w => renderWishlistCard(w, balance)).join('')}
-        </div>
-      ` : `
-        <div class="empty-state">
-          ${emptyStateIllustration('wishlist')}
-          <p>Nothing on the wishlist yet</p>
-          <p>Add something you want, then set it as a goal when you're ready to save for it.</p>
-        </div>
-      `}
-    </div>
-
-    <div class="section">
-      <div class="section-header-stack">
         <h3 class="section-title">Goals</h3>
         <p class="section-subtitle">Things you're actively saving for</p>
       </div>
@@ -1468,6 +1450,24 @@ function renderGoalsPage() {
           ${emptyStateIllustration('goals')}
           <p>No goals yet</p>
           <p>Add something to your wishlist and tap "Set as Goal" to start tracking your savings.</p>
+        </div>
+      `}
+    </div>
+
+    <div class="section">
+      <div class="section-header-stack">
+        <h3 class="section-title">Wishlist</h3>
+        <p class="section-subtitle">Things you want — tap "Set as Goal" when you're ready to start saving</p>
+      </div>
+      ${wishlist.length > 0 ? `
+        <div class="wishlist-list">
+          ${wishlist.map(w => renderWishlistCard(w, balance)).join('')}
+        </div>
+      ` : `
+        <div class="empty-state">
+          ${emptyStateIllustration('wishlist')}
+          <p>Nothing on the wishlist yet</p>
+          <p>Add something you want, then set it as a goal when you're ready to save for it.</p>
         </div>
       `}
     </div>
