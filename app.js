@@ -1595,6 +1595,7 @@ function renderChoresPage() {
                 <div class="chore-card-amount">+${formatMoney(c.amount)}</div>
                 <div class="chore-card-after">→ ${formatMoney(balance + c.amount)}</div>
                 <button class="chore-done-btn" onclick="markChoreDone('${sanitizeId(c.id)}')">Done! ✓</button>
+                <button class="chore-skip-btn" onclick="skipChore('${sanitizeId(c.id)}')">Skip</button>
               </div>
             `).join('')}
           </div>
@@ -2147,7 +2148,7 @@ function renderConfirm() {
         <p>${confirmAction.message}</p>
         <div class="confirm-actions">
           <button class="confirm-cancel" onclick="cancelConfirm()">Cancel</button>
-          <button class="confirm-delete" onclick="executeConfirm()">Delete</button>
+          <button class="confirm-delete" onclick="executeConfirm()">${confirmAction.label || 'Delete'}</button>
         </div>
       </div>
     </div>
@@ -2452,6 +2453,20 @@ window.openEditChoreModal = function(id) {
   choreRepeating = chore.repeating || false;
   chorePrefill = { name: '', amount: '' };
   modalOpen = 'chore';
+  render();
+};
+
+window.skipChore = function(id) {
+  const chore = (state.chores || []).find(c => c.id === id);
+  if (!chore) return;
+  confirmAction = {
+    message: `Skip "${escapeHtml(chore.name)}"? You won't get paid for it.`,
+    label: 'Skip it',
+    action: () => {
+      state.chores = state.chores.filter(c => c.id !== id);
+      saveData(state);
+    },
+  };
   render();
 };
 

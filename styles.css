@@ -2453,6 +2453,18 @@ body {
   flex-shrink: 0;
 }
 
+.chore-skip-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 8px;
+  margin-top: 2px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .chore-edit-btn {
   background: none;
   border: none;
