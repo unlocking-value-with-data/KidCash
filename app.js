@@ -232,7 +232,7 @@ function processRecurringActivities() {
 // ─── State ────────────────────────────────────────────────────
 let state = loadData();
 let currentView = 'home'; // 'home' | 'activity' | 'goals' | 'settings'
-let modalOpen = null; // null | 'transaction' | 'goal' | 'wishlist' | 'recurring'
+let modalOpen = null; // null | 'transaction' | 'wishlist' | 'recurring'
 let txType = 'income';
 let recurringType = 'income';
 let activityTab = 'history'; // 'history' | 'recurring'
@@ -1433,8 +1433,25 @@ function renderGoalsPage() {
 
   return `
     <div class="page-actions">
-      <button class="action-btn goal" onclick="openModal('goal')">+ New Goal</button>
-      <button class="action-btn wishlist-add" onclick="openWishlistModal()">+ Add from Web</button>
+      <button class="action-btn wishlist-add" onclick="openWishlistModal()">+ Add Item</button>
+    </div>
+
+    <div class="section">
+      <div class="section-header-stack">
+        <h3 class="section-title">Wishlist</h3>
+        <p class="section-subtitle">Things you want — tap "Set as Goal" when you're ready to start saving</p>
+      </div>
+      ${wishlist.length > 0 ? `
+        <div class="wishlist-list">
+          ${wishlist.map(w => renderWishlistCard(w, balance)).join('')}
+        </div>
+      ` : `
+        <div class="empty-state">
+          ${emptyStateIllustration('wishlist')}
+          <p>Nothing on the wishlist yet</p>
+          <p>Add something you want, then set it as a goal when you're ready to save for it.</p>
+        </div>
+      `}
     </div>
 
     <div class="section">
@@ -1450,25 +1467,7 @@ function renderGoalsPage() {
         <div class="empty-state">
           ${emptyStateIllustration('goals')}
           <p>No goals yet</p>
-          <p>Set a goal to start tracking your savings progress.</p>
-        </div>
-      `}
-    </div>
-
-    <div class="section">
-      <div class="section-header-stack">
-        <h3 class="section-title">Wishlist</h3>
-        <p class="section-subtitle">Things on your radar — promote to a goal when you're ready to save</p>
-      </div>
-      ${wishlist.length > 0 ? `
-        <div class="wishlist-list">
-          ${wishlist.map(w => renderWishlistCard(w, balance)).join('')}
-        </div>
-      ` : `
-        <div class="empty-state">
-          ${emptyStateIllustration('wishlist')}
-          <p>Nothing on the wishlist yet</p>
-          <p>Paste a product link to save it here, then promote it to a goal when you're ready.</p>
+          <p>Add something to your wishlist and tap "Set as Goal" to start tracking your savings.</p>
         </div>
       `}
     </div>
@@ -1897,7 +1896,7 @@ function renderWishlistCard(item, balance) {
         </div>
       </div>
       <div class="wishlist-actions">
-        <button class="wishlist-action-btn goal primary" onclick="wishlistToGoal('${sanitizeId(item.id)}')">→ Start Saving</button>
+        <button class="wishlist-action-btn goal primary" onclick="wishlistToGoal('${sanitizeId(item.id)}')">Set as Goal</button>
         <button class="wishlist-action-btn buy" onclick="wishlistToPurchase('${sanitizeId(item.id)}')">Buy</button>
         <button class="wishlist-action-btn delete" onclick="confirmDeleteWishlistItem('${sanitizeId(item.id)}')">Remove</button>
       </div>
@@ -1908,7 +1907,6 @@ function renderWishlistCard(item, balance) {
 // ─── Modals ──────────────────────────────────────────────────
 function renderModal() {
   if (modalOpen === 'transaction') return renderTransactionModal();
-  if (modalOpen === 'goal') return renderGoalModal();
   if (modalOpen === 'wishlist') return renderWishlistModal();
   if (modalOpen === 'recurring') return renderRecurringModal();
   if (modalOpen === 'chore') return renderChoreModal();
@@ -2097,25 +2095,6 @@ function renderTransactionModal() {
   `;
 }
 
-function renderGoalModal() {
-  return `
-    <div class="modal-overlay open" onclick="handleOverlayClick(event)">
-      <div class="modal">
-        <div class="modal-handle"></div>
-        <h2>New Saving Goal</h2>
-        <div class="form-group">
-          <label>What are you saving for?</label>
-          <input type="text" id="goalName" placeholder="e.g., New bicycle">
-        </div>
-        <div class="form-group">
-          <label>Target Amount</label>
-          <input type="number" id="goalTarget" placeholder="0.00" step="0.01" min="0.01" inputmode="decimal">
-        </div>
-        <button class="submit-btn" onclick="submitGoal()">Create Goal</button>
-      </div>
-    </div>
-  `;
-}
 
 function renderWishlistModal() {
   const statusHtml = fetchStatus === 'loading'
@@ -2134,11 +2113,11 @@ function renderWishlistModal() {
     <div class="modal-overlay open" onclick="handleOverlayClick(event)">
       <div class="modal">
         <div class="modal-handle"></div>
-        <h2>Add from Website</h2>
+        <h2>Add to Wishlist</h2>
         <div class="form-group">
-          <label>Product URL</label>
+          <label>Product URL <span class="label-optional">(optional)</span></label>
           <div class="url-input-group">
-            <input type="url" id="wishlistUrl" placeholder="Paste product link here..." inputmode="url">
+            <input type="url" id="wishlistUrl" placeholder="Paste a link to auto-fill..." inputmode="url">
             <button class="fetch-btn" onclick="doFetchProduct()" ${fetchStatus === 'loading' ? 'disabled' : ''}>
               ${fetchStatus === 'loading' ? '...' : 'Fetch'}
             </button>
@@ -2147,14 +2126,14 @@ function renderWishlistModal() {
         ${statusHtml}
         ${imagePreview}
         <div class="form-group">
-          <label>Product Name</label>
+          <label>Name</label>
           <input type="text" id="wishlistName" placeholder="e.g., LEGO Star Wars Set" value="${escapeHtml(fetchedProduct.name)}">
         </div>
         <div class="form-group">
           <label>Price</label>
           <input type="number" id="wishlistPrice" placeholder="0.00" step="0.01" min="0.01" inputmode="decimal" ${fetchedProduct.price ? `value="${fetchedProduct.price}"` : ''}>
         </div>
-        <button class="submit-btn" onclick="submitWishlistItem()" style="background:var(--purple)">Save to Wishlist</button>
+        <button class="submit-btn" onclick="submitWishlistItem()" style="background:var(--purple)">Add to Wishlist</button>
       </div>
     </div>
   `;
@@ -2204,12 +2183,6 @@ function bindEvents() {
   if (modalOpen === 'transaction') {
     setTimeout(() => {
       const el = document.getElementById('txAmount');
-      if (el) el.focus();
-    }, 100);
-  }
-  if (modalOpen === 'goal') {
-    setTimeout(() => {
-      const el = document.getElementById('goalName');
       if (el) el.focus();
     }, 100);
   }
@@ -2370,22 +2343,6 @@ window.submitTransaction = function() {
   render();
 };
 
-window.submitGoal = function() {
-  const name = document.getElementById('goalName').value.trim();
-  const target = parseMoney(document.getElementById('goalTarget').value);
-  const kid = getActiveKid();
-  if (!name) { shakeElement('goalName'); return; }
-  if (!target) { shakeElement('goalTarget'); return; }
-  state.goals.push({
-    id: generateId(),
-    kidId: kid.id,
-    name,
-    target,
-  });
-  saveData(state);
-  modalOpen = null;
-  render();
-};
 
 window.openAddTemplateModal = function() {
   editingTemplateId = null;
