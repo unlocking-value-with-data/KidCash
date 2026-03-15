@@ -1890,7 +1890,7 @@ function renderWishlistCard(item, balance) {
           <div class="wishlist-name">${escapeHtml(item.name)}</div>
           <div class="wishlist-price">${formatMoney(item.price)}${tax > 0 ? ` <span class="wishlist-price-withtax">~${formatMoney(totalWithTax)} with tax</span>` : ''}</div>
           ${remaining != null ? `<div class="wishlist-balance-after ${remaining < 0 ? 'negative' : ''}">${remaining >= 0 ? `${formatMoney(remaining)} left after` : `Need ${formatMoney(Math.abs(remaining))} more`}</div>` : ''}
-          <a class="wishlist-link" href="${sanitizeUrl(item.url)}" target="_blank" rel="noopener">View product ↗</a>
+          ${buildProductUrl(item.url) ? `<a class="wishlist-view-btn" href="${buildProductUrl(item.url)}" target="_blank" rel="noopener noreferrer">${svgIcon('<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>', 13)} View product</a>` : ''}
         </div>
       </div>
       <div class="wishlist-actions">
@@ -3171,6 +3171,14 @@ function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
+}
+
+// Returns the product URL, with a hook for future affiliate/referral parameters.
+// To add referral revenue: replace the return with an affiliate link builder.
+function buildProductUrl(url) {
+  if (!url) return null;
+  const safe = sanitizeUrl(url);
+  return safe === '#' ? null : safe;
 }
 
 function sanitizeUrl(url) {

@@ -749,6 +749,26 @@ body {
   color: var(--purple);
 }
 
+.wishlist-view-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  padding: 5px 10px;
+  border-radius: var(--radius-xs);
+  background: var(--purple-faint);
+  color: var(--purple);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid rgba(108, 92, 231, 0.15);
+  transition: background 0.15s;
+}
+
+.wishlist-view-btn:hover, .wishlist-view-btn:active {
+  background: rgba(108, 92, 231, 0.14);
+}
+
 .wishlist-actions {
   display: flex;
   gap: 6px;
