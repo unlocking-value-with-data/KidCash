@@ -276,6 +276,7 @@ let confirmAction = null;
 let pendingWishlistPurchase = null;
 let shareModalKidId = null;
 let wishlistShareClaims = null; // null=not loaded, {}=loading/empty, {itemId:{claimedBy}}=loaded
+let wishlistClaimsCache = {}; // { [kidId]: { [itemId]: claimData } | null } null=loading
 let fetchStatus = null;
 let fetchedProduct = { name: '', price: '', image: null };
 
@@ -1464,6 +1465,14 @@ function renderGoalsPage() {
   const goals = getKidGoals(kid.id);
   const wishlist = getKidWishlist(kid.id);
 
+  // Auto-load claims when sharing is active
+  const shareToken = (state.wishlistShares || {})[kid.id];
+  if (shareToken && wishlistClaimsCache[kid.id] === undefined) {
+    wishlistClaimsCache[kid.id] = null; // mark loading
+    loadClaimsForKid(kid.id, shareToken);
+  }
+  const kidClaims = wishlistClaimsCache[kid.id] || {};
+
   return `
     <div class="page-actions">
       <button class="action-btn wishlist-add" onclick="openWishlistModal()">+ Add Item</button>
@@ -1493,13 +1502,16 @@ function renderGoalsPage() {
           <h3 class="section-title">Wishlist</h3>
           <p class="section-subtitle">Things you want — tap "Set as Goal" when you're ready to start saving</p>
         </div>
-        <button class="wishlist-share-toggle-btn ${(state.wishlistShares || {})[kid.id] ? 'active' : ''}" onclick="openWishlistShare('${sanitizeId(kid.id)}')">
-          ${svgIcon('<path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/>', 15)} ${(state.wishlistShares || {})[kid.id] ? 'Shared' : 'Share'}
-        </button>
+        <div style="display:flex;gap:6px;align-items:center">
+          ${shareToken ? `<button class="claims-refresh-inline-btn" onclick="refreshKidClaims('${sanitizeId(kid.id)}')" title="Refresh gift status">↻</button>` : ''}
+          <button class="wishlist-share-toggle-btn ${shareToken ? 'active' : ''}" onclick="openWishlistShare('${sanitizeId(kid.id)}')">
+            ${svgIcon('<path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/>', 15)} ${shareToken ? 'Shared' : 'Share'}
+          </button>
+        </div>
       </div>
       ${wishlist.length > 0 ? `
         <div class="wishlist-list">
-          ${wishlist.map(w => renderWishlistCard(w, balance)).join('')}
+          ${wishlist.map(w => renderWishlistCard(w, balance, kidClaims[w.id] || null)).join('')}
         </div>
       ` : `
         <div class="empty-state">
@@ -1919,26 +1931,37 @@ function renderTransaction(t) {
   `;
 }
 
-function renderWishlistCard(item, balance) {
+function renderWishlistCard(item, balance, claim) {
   const hasImage = item.image;
   const tax = calcTax(item.price, selectedState);
   const totalWithTax = item.price + tax;
   const remaining = (balance != null) ? balance - totalWithTax : null;
+  const isClaimed = !!claim;
   return `
-    <div class="wishlist-card">
+    <div class="wishlist-card ${isClaimed ? 'wishlist-card--claimed' : ''}">
+      ${isClaimed ? `
+        <div class="wishlist-gift-banner">
+          <span class="wishlist-gift-icon">🎁</span>
+          <span><strong>${escapeHtml(claim.claimedBy)}</strong> is getting this for you!</span>
+        </div>
+      ` : ''}
       <div class="wishlist-top">
         ${hasImage ? `<img class="wishlist-image" src="${escapeHtml(item.image)}" alt="" onerror="this.style.display='none'">` : ''}
         <div class="wishlist-info">
           <div class="wishlist-name">${escapeHtml(item.name)}</div>
           <div class="wishlist-price">${formatMoney(item.price)}${tax > 0 ? ` <span class="wishlist-price-withtax">~${formatMoney(totalWithTax)} with tax</span>` : ''}</div>
-          ${remaining != null ? `<div class="wishlist-balance-after ${remaining < 0 ? 'negative' : ''}">${remaining >= 0 ? `${formatMoney(remaining)} left after` : `Need ${formatMoney(Math.abs(remaining))} more`}</div>` : ''}
+          ${!isClaimed && remaining != null ? `<div class="wishlist-balance-after ${remaining < 0 ? 'negative' : ''}">${remaining >= 0 ? `${formatMoney(remaining)} left after` : `Need ${formatMoney(Math.abs(remaining))} more`}</div>` : ''}
           ${buildProductUrl(item.url) ? `<a class="wishlist-view-btn" href="${buildProductUrl(item.url)}" target="_blank" rel="noopener noreferrer">${svgIcon('<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>', 13)} View product</a>` : ''}
         </div>
       </div>
       <div class="wishlist-actions">
-        <button class="wishlist-action-btn goal primary" onclick="wishlistToGoal('${sanitizeId(item.id)}')">Set as Goal</button>
-        <button class="wishlist-action-btn buy" onclick="wishlistToPurchase('${sanitizeId(item.id)}')">Buy</button>
-        <button class="wishlist-action-btn delete" onclick="confirmDeleteWishlistItem('${sanitizeId(item.id)}')">Remove</button>
+        ${isClaimed ? `
+          <button class="wishlist-action-btn delete" onclick="confirmDeleteWishlistItem('${sanitizeId(item.id)}')">Remove</button>
+        ` : `
+          <button class="wishlist-action-btn goal primary" onclick="wishlistToGoal('${sanitizeId(item.id)}')">Set as Goal</button>
+          <button class="wishlist-action-btn buy" onclick="wishlistToPurchase('${sanitizeId(item.id)}')">Buy</button>
+          <button class="wishlist-action-btn delete" onclick="confirmDeleteWishlistItem('${sanitizeId(item.id)}')">Remove</button>
+        `}
       </div>
     </div>
   `;
@@ -2232,7 +2255,6 @@ function renderWishlistShareModal() {
           <p class="share-modal-desc">Anyone with this link can see ${escapeHtml(kid.name)}'s wishlist and mark what they're buying — no login needed.</p>
           <div class="share-url-box">${escapeHtml(shareUrl)}</div>
           <button id="copyShareBtn" class="submit-btn" style="background:var(--purple)" onclick="copyShareLink('${escapeHtml(shareUrl)}')">Copy Link</button>
-          ${renderWishlistClaimsSection(kidId)}
           <button class="share-stop-btn" onclick="revokeWishlistShare('${sanitizeId(kidId)}')">Stop Sharing</button>
         ` : `
           <p class="share-modal-desc">Create a shareable link so family and friends can see ${escapeHtml(kid.name)}'s wishlist. No login needed — perfect for birthdays and holidays!</p>
@@ -2858,7 +2880,7 @@ window.openWishlistShare = function(kidId) {
 };
 
 async function loadWishlistClaims(token) {
-  wishlistShareClaims = {}; // mark as loading
+  wishlistShareClaims = {};
   try {
     const snap = await fbGetDocs(fbCollection(firebaseDb, 'public_wishlists', token, 'claims'));
     wishlistShareClaims = {};
@@ -2868,6 +2890,25 @@ async function loadWishlistClaims(token) {
   }
   if (modalOpen === 'wishlist-share') render();
 }
+
+async function loadClaimsForKid(kidId, token) {
+  try {
+    const snap = await fbGetDocs(fbCollection(firebaseDb, 'public_wishlists', token, 'claims'));
+    wishlistClaimsCache[kidId] = {};
+    snap.forEach(d => { wishlistClaimsCache[kidId][d.id] = d.data(); });
+  } catch (e) {
+    wishlistClaimsCache[kidId] = {};
+  }
+  render();
+}
+
+window.refreshKidClaims = function(kidId) {
+  const token = (state.wishlistShares || {})[kidId];
+  if (!token) return;
+  wishlistClaimsCache[kidId] = null;
+  render();
+  loadClaimsForKid(kidId, token);
+};
 
 window.refreshWishlistClaims = function() {
   const token = (state.wishlistShares || {})[shareModalKidId];
@@ -2899,6 +2940,7 @@ window.revokeWishlistShare = async function(kidId) {
     await fbDeleteDoc(fbDoc(firebaseDb, 'public_wishlists', token));
   } catch (e) { /* best-effort */ }
   delete state.wishlistShares[kidId];
+  delete wishlistClaimsCache[kidId];
   saveData(state);
   modalOpen = null;
   render();
