@@ -75,6 +75,8 @@ async function writeToFirestore(uid, data) {
     wishlistShares: data.wishlistShares || {},
   };
   if (data.parentPin) payload.parentPin = data.parentPin;
+  if (data.paypalMe)   payload.paypalMe = data.paypalMe;
+  if (data.venmoHandle) payload.venmoHandle = data.venmoHandle;
   await fbSetDoc(docRef, payload);
 }
 
@@ -95,6 +97,8 @@ async function syncPublicWishlist(kidId, token) {
     })),
     updatedAt: Date.now(),
     uid: currentUser.uid,
+    ...(state.paypalMe   ? { paypalMe: state.paypalMe }     : {}),
+    ...(state.venmoHandle ? { venmoHandle: state.venmoHandle } : {}),
   });
 }
 
@@ -1903,6 +1907,34 @@ function renderSettingsPage() {
     </div>
 
     <div class="settings-section">
+      <label class="settings-section-label">Payment Links</label>
+      <p class="settings-about" style="margin-bottom:12px">
+        Let family and friends know where to send gift contributions.
+        These will be visible to anyone who has a wishlist share link — use a username, not an email.
+      </p>
+      <div class="form-group" style="margin-bottom:10px">
+        <label>PayPal.me username</label>
+        <div class="payment-handle-row">
+          <span class="payment-handle-prefix">paypal.me/</span>
+          <input type="text" class="payment-handle-input"
+                 value="${escapeHtml(state.paypalMe || '')}"
+                 maxlength="30" placeholder="yourname"
+                 onchange="setPaymentHandle('paypalMe', this.value)">
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label>Venmo handle</label>
+        <div class="payment-handle-row">
+          <span class="payment-handle-prefix">@</span>
+          <input type="text" class="payment-handle-input"
+                 value="${escapeHtml(state.venmoHandle || '')}"
+                 maxlength="30" placeholder="yourname"
+                 onchange="setPaymentHandle('venmoHandle', this.value)">
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section">
       <label class="settings-section-label">About</label>
       <p class="settings-about">KidCash helps families track kids' money without needing a bank account. Your data syncs securely across all your devices.</p>
     </div>
@@ -3341,6 +3373,13 @@ window.toggleParentPinVisibility = function() {
     // Swap to eye icon
     icon.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>';
   }
+};
+
+window.setPaymentHandle = function(field, value) {
+  // Strip leading @, spaces, and any non-alphanumeric/hyphen/underscore chars
+  const cleaned = value.replace(/^@/, '').replace(/[^a-zA-Z0-9_\-]/g, '').slice(0, 30);
+  state[field] = cleaned || undefined;
+  saveData(state);
 };
 
 window.setParentPin = async function(value) {

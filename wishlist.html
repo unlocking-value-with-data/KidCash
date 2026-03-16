@@ -172,6 +172,42 @@
     .footer { text-align: center; margin-top: 40px; font-size: 12px; color: var(--text-muted); }
     .footer a { color: var(--purple); text-decoration: none; font-weight: 600; }
 
+    /* Payment banner */
+    .payment-banner {
+      background: var(--card); border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-sm); padding: 14px 16px;
+      margin-bottom: 16px;
+    }
+    .payment-banner-label {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 10px;
+    }
+    .payment-links { display: flex; gap: 10px; flex-wrap: wrap; }
+    .payment-link {
+      display: flex; align-items: center; gap: 7px;
+      padding: 8px 14px; border-radius: 8px;
+      font-size: 13px; font-weight: 700; text-decoration: none;
+      flex: 1; min-width: 120px; justify-content: center;
+    }
+    .payment-link--paypal {
+      background: #003087; color: #fff;
+    }
+    .payment-link--venmo {
+      background: #008CFF; color: #fff;
+    }
+    .payment-link:active { opacity: 0.85; }
+    .payment-link-icon { font-size: 16px; }
+
+    /* Post-contribution send prompt */
+    .send-prompt {
+      background: rgba(0,168,120,0.07); border: 1.5px solid rgba(0,168,120,0.25);
+      border-radius: 10px; padding: 12px 14px; margin-top: 10px;
+    }
+    .send-prompt-title {
+      font-size: 13px; font-weight: 700; color: var(--green); margin-bottom: 8px;
+    }
+    .send-prompt-links { display: flex; gap: 8px; flex-wrap: wrap; }
+
     /* Contribution summary */
     .contrib-summary { margin-bottom: 12px; }
 
@@ -260,10 +296,34 @@
     let claims = {}; // { [itemId]: { claimedBy, claimedAt, contributions: [] } }
     let claimingItemId = null;
     let contributingItemId = null;
+    let lastContribution = null; // { itemId, amountCents } — shown after contribution success
     let shareToken = null;
 
     function genId() {
       return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    }
+
+    // Validate a payment handle: alphanumeric, hyphens, underscores only
+    function safeHandle(str) {
+      return typeof str === 'string' ? str.replace(/[^a-zA-Z0-9_\-]/g, '').slice(0, 30) : '';
+    }
+
+    function buildPaymentLinksHtml(amountCents) {
+      const paypal = safeHandle(wishlistData?.paypalMe);
+      const venmo  = safeHandle(wishlistData?.venmoHandle);
+      if (!paypal && !venmo) return '';
+      const amountStr = amountCents ? (amountCents / 100).toFixed(2) : '';
+      const paypalHref = paypal
+        ? `https://paypal.me/${paypal}${amountStr ? '/' + amountStr : ''}`
+        : null;
+      const venmoHref = venmo
+        ? `https://account.venmo.com/u/${venmo}`
+        : null;
+      const links = [
+        paypalHref ? `<a class="payment-link payment-link--paypal" href="${esc(paypalHref)}" target="_blank" rel="noopener noreferrer"><span class="payment-link-icon">𝐏</span> PayPal${amountStr ? ' $' + amountStr : ''}</a>` : '',
+        venmoHref  ? `<a class="payment-link payment-link--venmo"  href="${esc(venmoHref)}"  target="_blank" rel="noopener noreferrer"><span class="payment-link-icon">V</span> Venmo</a>` : '',
+      ].filter(Boolean).join('');
+      return links;
     }
 
     // ── Helpers ────────────────────────────────────────────────
@@ -351,6 +411,7 @@
         if (!claims[itemId].contributions) claims[itemId].contributions = [];
         claims[itemId].contributions.push(contribution);
         contributingItemId = null;
+        lastContribution = { itemId, amountCents };
         render();
       } catch (e) {
         console.error('Failed to save contribution:', e);
@@ -397,6 +458,13 @@
            </div>`
         : `<div class="items-list">${items.map(item => renderItem(item)).join('')}</div>`;
 
+      const paymentLinks = buildPaymentLinksHtml(0);
+      const paymentBannerHtml = paymentLinks ? `
+        <div class="payment-banner">
+          <div class="payment-banner-label">Send contributions to</div>
+          <div class="payment-links">${paymentLinks}</div>
+        </div>` : '';
+
       root.innerHTML = `
         <div class="header">
           <div class="header-logo">KidCash</div>
@@ -405,6 +473,7 @@
           <div class="header-tagline">Here's what ${esc(kidName)} is hoping for</div>
         </div>
         <div class="content">
+          ${paymentBannerHtml}
           ${itemsHtml}
           <div class="footer">Powered by <a href="${esc(window.location.origin)}">KidCash</a></div>
         </div>`;
@@ -442,8 +511,20 @@
           </div>
         </div>` : '';
 
+      // Send prompt shown after a successful contribution on this item
+      const justContributed = lastContribution?.itemId === item.id;
+      const sendPromptHtml = justContributed ? (() => {
+        const links = buildPaymentLinksHtml(lastContribution.amountCents);
+        return links ? `
+          <div class="send-prompt">
+            <div class="send-prompt-title">✓ Logged! Now send the money:</div>
+            <div class="send-prompt-links">${links}</div>
+          </div>` : '';
+      })() : '';
+
       let footerHtml = '';
       if (isClaimed) {
+        const claimPaymentLinks = buildPaymentLinksHtml(item.price);
         footerHtml = `
           <div class="item-footer">
             ${contribSummaryHtml}
@@ -454,6 +535,11 @@
               </div>
               <button class="undo-btn" onclick="_unclaim('${item.id}')">Undo</button>
             </div>
+            ${claimPaymentLinks ? `
+              <div class="send-prompt" style="margin-top:10px">
+                <div class="send-prompt-title">Send payment to:</div>
+                <div class="send-prompt-links">${claimPaymentLinks}</div>
+              </div>` : ''}
           </div>`;
       } else if (isClaiming) {
         footerHtml = `
@@ -484,6 +570,7 @@
         footerHtml = `
           <div class="item-footer">
             ${contribSummaryHtml}
+            ${sendPromptHtml}
             <div class="item-action-row">
               <button class="claim-btn" onclick="_startClaim('${item.id}')">🎁 I'll buy this!</button>
               <button class="contrib-btn" onclick="_startContribute('${item.id}')">💰 Contribute</button>

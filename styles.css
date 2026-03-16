@@ -2082,6 +2082,44 @@ body {
 }
 
 /* ─── Toggle Switch ──────────────────────────────────────────── */
+.payment-handle-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-xs);
+  overflow: hidden;
+  background: var(--card);
+}
+
+.payment-handle-prefix {
+  padding: 9px 10px;
+  background: var(--bg-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-right: 1.5px solid var(--border);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.payment-handle-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  padding: 9px 12px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  background: transparent;
+  color: var(--text);
+}
+
+.payment-handle-input::placeholder {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
 .settings-toggle-row {
   display: flex;
   align-items: center;
