@@ -275,6 +275,7 @@ let editingTemplateId = null;
 let confirmAction = null;
 let pendingWishlistPurchase = null;
 let shareModalKidId = null;
+let wishlistShareClaims = null; // null=not loaded, {}=loading/empty, {itemId:{claimedBy}}=loaded
 let fetchStatus = null;
 let fetchedProduct = { name: '', price: '', image: null };
 
@@ -2179,6 +2180,42 @@ function renderWishlistModal() {
   `;
 }
 
+function renderWishlistClaimsSection(kidId) {
+  const wishlist = getKidWishlist(kidId);
+  if (wishlist.length === 0) return '';
+
+  if (wishlistShareClaims === null) {
+    return `<div class="claims-section"><p class="claims-loading">Loading gift claims…</p></div>`;
+  }
+
+  const claimed = wishlist.filter(w => wishlistShareClaims[w.id]);
+  const unclaimed = wishlist.filter(w => !wishlistShareClaims[w.id]);
+
+  return `
+    <div class="claims-section">
+      <div class="claims-header">
+        <span class="claims-title">Gift Status</span>
+        <button class="claims-refresh-btn" onclick="refreshWishlistClaims()">↻ Refresh</button>
+      </div>
+      ${claimed.length === 0 && unclaimed.length > 0 ? `
+        <p class="claims-empty">No one has claimed anything yet.</p>
+      ` : ''}
+      ${claimed.map(w => `
+        <div class="claim-row claimed">
+          <div class="claim-row-name">${escapeHtml(w.name)}</div>
+          <div class="claim-row-by">🎁 ${escapeHtml(wishlistShareClaims[w.id].claimedBy)}</div>
+        </div>
+      `).join('')}
+      ${unclaimed.map(w => `
+        <div class="claim-row">
+          <div class="claim-row-name">${escapeHtml(w.name)}</div>
+          <div class="claim-row-status">Not claimed</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
 function renderWishlistShareModal() {
   const kidId = shareModalKidId;
   const kid = state.kids.find(k => k.id === kidId);
@@ -2195,7 +2232,7 @@ function renderWishlistShareModal() {
           <p class="share-modal-desc">Anyone with this link can see ${escapeHtml(kid.name)}'s wishlist and mark what they're buying — no login needed.</p>
           <div class="share-url-box">${escapeHtml(shareUrl)}</div>
           <button id="copyShareBtn" class="submit-btn" style="background:var(--purple)" onclick="copyShareLink('${escapeHtml(shareUrl)}')">Copy Link</button>
-          <a class="share-view-btn" href="${escapeHtml(shareUrl)}" target="_blank" rel="noopener noreferrer">See who's buying what →</a>
+          ${renderWishlistClaimsSection(kidId)}
           <button class="share-stop-btn" onclick="revokeWishlistShare('${sanitizeId(kidId)}')">Stop Sharing</button>
         ` : `
           <p class="share-modal-desc">Create a shareable link so family and friends can see ${escapeHtml(kid.name)}'s wishlist. No login needed — perfect for birthdays and holidays!</p>
@@ -2813,8 +2850,28 @@ window.updateDefaultState = function(stateCode) {
 // ─── Wishlist Handlers ────────────────────────────────────────
 window.openWishlistShare = function(kidId) {
   shareModalKidId = kidId;
+  wishlistShareClaims = null;
   modalOpen = 'wishlist-share';
   render();
+  const token = (state.wishlistShares || {})[kidId];
+  if (token) loadWishlistClaims(token);
+};
+
+async function loadWishlistClaims(token) {
+  wishlistShareClaims = {}; // mark as loading
+  try {
+    const snap = await fbGetDocs(fbCollection(firebaseDb, 'public_wishlists', token, 'claims'));
+    wishlistShareClaims = {};
+    snap.forEach(d => { wishlistShareClaims[d.id] = d.data(); });
+  } catch (e) {
+    wishlistShareClaims = null;
+  }
+  if (modalOpen === 'wishlist-share') render();
+}
+
+window.refreshWishlistClaims = function() {
+  const token = (state.wishlistShares || {})[shareModalKidId];
+  if (token) loadWishlistClaims(token);
 };
 
 window.shareWishlist = async function(kidId) {
