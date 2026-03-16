@@ -195,6 +195,10 @@
     .payment-link--venmo {
       background: #008CFF; color: #fff;
     }
+    .payment-link--apple {
+      background: #1c1c1e; color: #fff; border: none; cursor: pointer;
+      font-family: inherit; font-size: 13px; font-weight: 700;
+    }
     .payment-link:active { opacity: 0.85; }
     .payment-link-icon { font-size: 16px; }
 
@@ -311,7 +315,8 @@
     function buildPaymentLinksHtml(amountCents) {
       const paypal = safeHandle(wishlistData?.paypalMe);
       const venmo  = safeHandle(wishlistData?.venmoHandle);
-      if (!paypal && !venmo) return '';
+      const apple  = wishlistData?.appleCash || '';
+      if (!paypal && !venmo && !apple) return '';
       const amountStr = amountCents ? (amountCents / 100).toFixed(2) : '';
       const paypalHref = paypal
         ? `https://paypal.me/${paypal}${amountStr ? '/' + amountStr : ''}`
@@ -322,9 +327,21 @@
       const links = [
         paypalHref ? `<a class="payment-link payment-link--paypal" href="${esc(paypalHref)}" target="_blank" rel="noopener noreferrer"><span class="payment-link-icon">𝐏</span> PayPal${amountStr ? ' $' + amountStr : ''}</a>` : '',
         venmoHref  ? `<a class="payment-link payment-link--venmo"  href="${esc(venmoHref)}"  target="_blank" rel="noopener noreferrer"><span class="payment-link-icon">V</span> Venmo</a>` : '',
+        apple      ? `<button class="payment-link payment-link--apple" onclick="_copyAppleCash(this)"><span class="payment-link-icon">🍎</span> Apple Cash</button>` : '',
       ].filter(Boolean).join('');
       return links;
     }
+
+    window._copyAppleCash = function(btn) {
+      const handle = wishlistData?.appleCash || '';
+      if (!handle) return;
+      navigator.clipboard.writeText(handle).then(() => {
+        btn.textContent = '✓ Copied!';
+        setTimeout(() => { btn.innerHTML = '<span class="payment-link-icon">🍎</span> Apple Cash'; }, 2000);
+      }).catch(() => {
+        btn.textContent = handle; // fallback: show the handle directly
+      });
+    };
 
     // ── Helpers ────────────────────────────────────────────────
     function formatMoney(cents) {

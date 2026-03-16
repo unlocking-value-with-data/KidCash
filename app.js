@@ -75,8 +75,9 @@ async function writeToFirestore(uid, data) {
     wishlistShares: data.wishlistShares || {},
   };
   if (data.parentPin) payload.parentPin = data.parentPin;
-  if (data.paypalMe)   payload.paypalMe = data.paypalMe;
+  if (data.paypalMe)    payload.paypalMe    = data.paypalMe;
   if (data.venmoHandle) payload.venmoHandle = data.venmoHandle;
+  if (data.appleCash)   payload.appleCash   = data.appleCash;
   await fbSetDoc(docRef, payload);
 }
 
@@ -97,8 +98,9 @@ async function syncPublicWishlist(kidId, token) {
     })),
     updatedAt: Date.now(),
     uid: currentUser.uid,
-    ...(state.paypalMe   ? { paypalMe: state.paypalMe }     : {}),
+    ...(state.paypalMe    ? { paypalMe:    state.paypalMe }    : {}),
     ...(state.venmoHandle ? { venmoHandle: state.venmoHandle } : {}),
+    ...(state.appleCash   ? { appleCash:   state.appleCash }   : {}),
   });
 }
 
@@ -1911,6 +1913,7 @@ function renderSettingsPage() {
       <p class="settings-about" style="margin-bottom:12px">
         Let family and friends know where to send gift contributions.
         These will be visible to anyone who has a wishlist share link — use a username, not an email.
+        For Apple Cash, a phone number or Apple ID email is required.
       </p>
       <div class="form-group" style="margin-bottom:10px">
         <label>PayPal.me username</label>
@@ -1922,7 +1925,7 @@ function renderSettingsPage() {
                  onchange="setPaymentHandle('paypalMe', this.value)">
         </div>
       </div>
-      <div class="form-group" style="margin-bottom:0">
+      <div class="form-group" style="margin-bottom:10px">
         <label>Venmo handle</label>
         <div class="payment-handle-row">
           <span class="payment-handle-prefix">@</span>
@@ -1931,6 +1934,13 @@ function renderSettingsPage() {
                  maxlength="30" placeholder="yourname"
                  onchange="setPaymentHandle('venmoHandle', this.value)">
         </div>
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label>Apple Cash (phone or Apple ID email)</label>
+        <input type="text" class="payment-handle-input" style="border:1.5px solid var(--border);border-radius:var(--radius-xs);padding:9px 12px;width:100%;box-sizing:border-box"
+               value="${escapeHtml(state.appleCash || '')}"
+               maxlength="50" placeholder="+1 (555) 000-0000 or you@icloud.com"
+               onchange="setAppleCash(this.value)">
       </div>
     </div>
 
@@ -3379,6 +3389,15 @@ window.setPaymentHandle = function(field, value) {
   // Strip leading @, spaces, and any non-alphanumeric/hyphen/underscore chars
   const cleaned = value.replace(/^@/, '').replace(/[^a-zA-Z0-9_\-]/g, '').slice(0, 30);
   state[field] = cleaned || undefined;
+  saveData(state);
+};
+
+window.setAppleCash = function(value) {
+  const trimmed = value.trim().slice(0, 50);
+  // Accept phone numbers (digits, spaces, +, -, (, )) or email addresses
+  const isPhone = /^[+\d][\d\s\-().]{6,}$/.test(trimmed);
+  const isEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(trimmed);
+  state.appleCash = (isPhone || isEmail) ? trimmed : undefined;
   saveData(state);
 };
 
