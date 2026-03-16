@@ -40,6 +40,24 @@
 //            request.resource.data.contributions is list);
 //       }
 //     }
+//     // Public chore boards — anyone can read/submit, only signed-in users write parent doc
+//     match /public_chore_boards/{token} {
+//       allow read: if true;
+//       allow write, delete: if request.auth != null;
+//       match /pending/{choreId} {
+//         allow read: if true;
+//         allow create: if
+//           request.resource.data.name is string &&
+//           request.resource.data.name.size() >= 2 &&
+//           request.resource.data.name.size() <= 100 &&
+//           request.resource.data.amount is number &&
+//           request.resource.data.amount >= 100 &&
+//           request.resource.data.amount <= 50000 &&
+//           request.resource.data.addedBy is string &&
+//           request.resource.data.addedBy.size() <= 50;
+//         allow delete: if true;
+//       }
+//     }
 //   }
 // }
 // ───────────────────────────────────────────────────────────────

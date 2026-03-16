@@ -14,6 +14,7 @@ function getDefaultData() {
     recurringActivities: [],
     activeKidIndex: 0,
     wishlistShares: {}, // { [kidId]: shareToken }
+    choreShares: {}, // { [kidId]: shareToken }
   };
 }
 
@@ -25,6 +26,7 @@ function loadData() {
       if (!data.goals) data.goals = [];
       if (!data.wishlist) data.wishlist = [];
       if (!data.wishlistShares) data.wishlistShares = {};
+      if (!data.choreShares) data.choreShares = {};
       if (!data.chores) data.chores = [];
       if (!data.recurringActivities) data.recurringActivities = [];
       // choreTemplates intentionally left as undefined/null — getChoreTemplates() handles defaults
@@ -73,6 +75,7 @@ async function writeToFirestore(uid, data) {
     activeKidIndex: data.activeKidIndex || 0,
     updatedAt: data.updatedAt || Date.now(),
     wishlistShares: data.wishlistShares || {},
+    choreShares: data.choreShares || {},
   };
   if (data.parentPin) payload.parentPin = data.parentPin;
   if (data.paypalMe)    payload.paypalMe    = data.paypalMe;
@@ -111,6 +114,26 @@ async function syncAllPublicWishlists() {
   }
 }
 
+async function syncPublicChoreBoard(kidId, token) {
+  if (!window.fbSetDoc || !window.firebaseDb || !currentUser) return;
+  const kid = state.kids.find(k => k.id === kidId);
+  if (!kid) return;
+  const docRef = fbDoc(firebaseDb, 'public_chore_boards', token);
+  await fbSetDoc(docRef, {
+    kidName: kid.name,
+    kidId: kid.id,
+    updatedAt: Date.now(),
+    uid: currentUser.uid,
+  });
+}
+
+async function syncAllPublicChoreBoards() {
+  const shares = state.choreShares || {};
+  for (const [kidId, token] of Object.entries(shares)) {
+    try { await syncPublicChoreBoard(kidId, token); } catch (e) { /* best-effort */ }
+  }
+}
+
 // Schedule a debounced sync (waits 1.5s after last change)
 function scheduleSyncToFirestore() {
   if (!currentUser || !window.fbSetDoc) return;
@@ -142,6 +165,7 @@ async function flushToFirestore() {
   try {
     await writeToFirestore(currentUser.uid, state); // use in-memory state, not re-read from localStorage
     await syncAllPublicWishlists();
+    await syncAllPublicChoreBoards();
     if (syncStatus !== 'ok') {
       syncStatus = 'ok';
       render();
@@ -191,6 +215,8 @@ async function loadFromFirestore(uid) {
       const cloudTime = cloudData.updatedAt || 0;
       if (!cloudData.goals) cloudData.goals = [];
       if (!cloudData.wishlist) cloudData.wishlist = [];
+      if (!cloudData.wishlistShares) cloudData.wishlistShares = {};
+      if (!cloudData.choreShares) cloudData.choreShares = {};
       if (!cloudData.chores) cloudData.chores = [];
       if (!cloudData.recurringActivities) cloudData.recurringActivities = [];
 
@@ -283,6 +309,7 @@ let pendingWishlistPurchase = null;
 let shareModalKidId = null;
 let wishlistShareClaims = null; // null=not loaded, {}=loading/empty, {itemId:{claimedBy}}=loaded
 let wishlistClaimsCache = {}; // { [kidId]: { [itemId]: claimData } | null } null=loading
+let pendingChoresCache = {}; // { [kidId]: null | { [choreId]: choreData } }
 let fetchStatus = null;
 let fetchedProduct = { name: '', price: '', image: null };
 
@@ -1093,6 +1120,8 @@ function renderBottomNav() {
   ];
 
   const pendingChores = (state.chores || []).filter(c => c.status === 'pending').length;
+  const pendingFamilyChores = Object.values(pendingChoresCache).reduce((sum, v) => sum + (v ? Object.keys(v).length : 0), 0);
+  const totalPendingChores = pendingChores + pendingFamilyChores;
   return `
     <nav class="bottom-nav">
       ${tabs.map(tab => `
@@ -1100,7 +1129,7 @@ function renderBottomNav() {
                 onclick="navigateTo('${tab.id}')">
           <span class="bottom-nav-icon-wrap">
             ${tab.icon}
-            ${tab.id === 'chores' && pendingChores > 0 ? `<span class="nav-badge">${pendingChores}</span>` : ''}
+            ${tab.id === 'chores' && totalPendingChores > 0 ? `<span class="nav-badge">${totalPendingChores}</span>` : ''}
           </span>
           <span class="bottom-nav-label">${tab.label}</span>
         </button>
@@ -1759,10 +1788,56 @@ function renderChoresPage() {
   }
 
   // ── Parent View ──────────────────────────────────────
+  // Load pending family chores if not yet loaded
+  const choreShareToken = (state.choreShares || {})[getActiveKid()?.id || ''];
+  if (choreShareToken) {
+    const kidId = getActiveKid()?.id;
+    if (kidId && pendingChoresCache[kidId] === undefined) {
+      pendingChoresCache[kidId] = null; // mark as loading
+      loadPendingChoresForKid(kidId, choreShareToken);
+    }
+  }
+  const activeKidId = getActiveKid()?.id;
+  const pendingFamily = activeKidId && pendingChoresCache[activeKidId]
+    ? Object.entries(pendingChoresCache[activeKidId]).map(([id, data]) => ({ id, ...data }))
+    : [];
+
   const pendingAll = allChores.filter(c => c.status === 'pending');
   const activeAll = allChores.filter(c => c.status !== 'approved');
 
   return `
+    ${choreShareToken ? `
+      ${pendingFamily.length > 0 ? `
+        <div class="section chore-family-section">
+          <div class="section-header">
+            <h3 class="section-title">🏠 Suggested by Family</h3>
+            <div style="display:flex;gap:6px;align-items:center">
+              <span class="approval-badge">${pendingFamily.length}</span>
+              <button class="claims-refresh-inline-btn" onclick="refreshPendingChores('${sanitizeId(activeKidId)}')" title="Refresh">↻</button>
+            </div>
+          </div>
+          <div class="chore-approval-list">
+            ${pendingFamily.map(c => `
+              <div class="chore-approval-card chore-family-card">
+                <div class="chore-approval-info">
+                  <div class="chore-approval-name">${escapeHtml(c.name)}</div>
+                  <div class="chore-approval-kid">
+                    From ${escapeHtml(c.addedBy || 'Family')} · +${formatMoney(c.amount)}
+                    ${c.note ? `<div class="chore-family-note">"${escapeHtml(c.note)}"</div>` : ''}
+                  </div>
+                </div>
+                <div class="chore-approval-btns">
+                  <button class="chore-approve-btn" onclick="approvePendingChore('${sanitizeId(activeKidId)}', '${sanitizeId(c.id)}')">✓</button>
+                  <button class="chore-reject-btn" onclick="rejectPendingChore('${sanitizeId(activeKidId)}', '${sanitizeId(c.id)}')">✕</button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : pendingChoresCache[activeKidId] === null ? `
+        <div class="section"><p style="color:var(--text-muted);font-size:13px;text-align:center;padding:12px">Loading family suggestions…</p></div>
+      ` : ''}
+    ` : ''}
     ${pendingAll.length > 0 ? `
       <div class="section chore-approvals-section">
         <div class="section-header">
@@ -1793,7 +1868,10 @@ function renderChoresPage() {
     <div class="section">
       <div class="section-header">
         <h3 class="section-title">Active Chores</h3>
-        <button class="section-link" onclick="openModal('chore')">+ Add</button>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="wishlist-share-toggle-btn ${choreShareToken ? 'active' : ''}" onclick="openChoreShare('${sanitizeId(activeKidId)}')">🏠 Family</button>
+          <button class="section-link" onclick="openModal('chore')">+ Add</button>
+        </div>
       </div>
       ${activeAll.filter(c => c.status !== 'pending').length === 0 && pendingAll.length === 0 ? `
         <div class="empty-state">
@@ -2086,6 +2164,7 @@ function renderModal() {
   if (modalOpen === 'transaction') return renderTransactionModal();
   if (modalOpen === 'wishlist') return renderWishlistModal();
   if (modalOpen === 'wishlist-share') return renderWishlistShareModal();
+  if (modalOpen === 'choreShare') return renderChoreShareModal();
   if (modalOpen === 'recurring') return renderRecurringModal();
   if (modalOpen === 'chore') return renderChoreModal();
   if (modalOpen === 'template') return renderTemplateModal();
@@ -2373,6 +2452,38 @@ function renderWishlistShareModal() {
         ` : `
           <p class="share-modal-desc">Create a shareable link so family and friends can see ${escapeHtml(kid.name)}'s wishlist. No login needed — perfect for birthdays and holidays!</p>
           <button class="submit-btn" style="background:var(--purple)" onclick="shareWishlist('${sanitizeId(kidId)}')">Create Share Link</button>
+        `}
+      </div>
+    </div>
+  `;
+}
+
+function renderChoreShareModal() {
+  const kidId = choreShareModalKidId;
+  const kid = state.kids.find(k => k.id === kidId);
+  if (!kid) return '';
+  const token = (state.choreShares || {})[kidId];
+  const shareUrl = token
+    ? new URL('choreboard.html', window.location.href).href.split('?')[0] + '?id=' + token
+    : null;
+  return `
+    <div class="modal-overlay open" onclick="handleOverlayClick(event)">
+      <div class="modal">
+        <div class="modal-handle"></div>
+        <h2>Family Chore Board</h2>
+        <p class="share-modal-desc">
+          Share this link with family and friends. They can suggest chores and set reward amounts for ${escapeHtml(kid.name)}.
+          You'll review and approve each one before it appears to ${escapeHtml(kid.name)}.
+        </p>
+        ${token && shareUrl ? `
+          <div class="share-url-box">${escapeHtml(shareUrl)}</div>
+          <div style="display:flex;gap:8px;margin-bottom:12px">
+            <button id="copyChoreLinkBtn" class="submit-btn" style="flex:1;background:var(--purple)" onclick="copyChoreLink('${escapeHtml(shareUrl)}')">Copy Link</button>
+            <a class="share-view-btn" href="${escapeHtml(shareUrl)}" target="_blank" rel="noopener noreferrer">Preview</a>
+          </div>
+          <button class="share-stop-btn" onclick="revokeChoreBoard('${sanitizeId(kidId)}')">Stop Sharing</button>
+        ` : `
+          <button class="submit-btn" style="background:var(--purple);width:100%" onclick="shareChoreBoard('${sanitizeId(kidId)}')">Create Share Link</button>
         `}
       </div>
     </div>
@@ -3065,6 +3176,99 @@ window.copyShareLink = function(url) {
     const btn = document.getElementById('copyShareBtn');
     if (btn) { btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = 'Copy Link'; }, 2000); }
   });
+};
+
+// ─── Chore Board Share ──────────────────────────────────────
+let choreShareModalKidId = null;
+
+window.openChoreShare = function(kidId) {
+  choreShareModalKidId = kidId;
+  modalOpen = 'choreShare';
+  render();
+};
+
+window.shareChoreBoard = async function(kidId) {
+  if (!currentUser) return;
+  if (!state.choreShares) state.choreShares = {};
+  let token = state.choreShares[kidId];
+  if (!token) {
+    token = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+      .map(b => b.toString(16).padStart(2, '0')).join('');
+    state.choreShares[kidId] = token;
+    saveData(state);
+  }
+  try { await syncPublicChoreBoard(kidId, token); } catch (e) { console.error('Failed to create chore share:', e); }
+  render();
+};
+
+window.revokeChoreBoard = async function(kidId) {
+  const token = (state.choreShares || {})[kidId];
+  if (!token) return;
+  try { await fbDeleteDoc(fbDoc(firebaseDb, 'public_chore_boards', token)); } catch (e) { /* best-effort */ }
+  delete state.choreShares[kidId];
+  delete pendingChoresCache[kidId];
+  saveData(state);
+  modalOpen = null;
+  render();
+};
+
+window.copyChoreLink = function(url) {
+  navigator.clipboard.writeText(url).then(() => {
+    const btn = document.getElementById('copyChoreLinkBtn');
+    if (btn) { btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = 'Copy Link'; }, 2000); }
+  });
+};
+
+async function loadPendingChoresForKid(kidId, token) {
+  try {
+    const snap = await fbGetDocs(fbCollection(firebaseDb, 'public_chore_boards', token, 'pending'));
+    pendingChoresCache[kidId] = {};
+    snap.forEach(d => { pendingChoresCache[kidId][d.id] = d.data(); });
+  } catch (e) {
+    pendingChoresCache[kidId] = {};
+  }
+  render();
+}
+
+window.refreshPendingChores = function(kidId) {
+  const token = (state.choreShares || {})[kidId];
+  if (!token) return;
+  pendingChoresCache[kidId] = null;
+  render();
+  loadPendingChoresForKid(kidId, token);
+};
+
+window.approvePendingChore = async function(kidId, choreId) {
+  const token = (state.choreShares || {})[kidId];
+  if (!token) return;
+  const pending = pendingChoresCache[kidId]?.[choreId];
+  if (!pending) return;
+  // Add to real chores
+  if (!state.chores) state.chores = [];
+  state.chores.push({
+    id: generateId(),
+    kidId,
+    name: pending.name,
+    amount: pending.amount,
+    repeating: false,
+    status: 'available',
+    createdAt: Date.now(),
+    addedBy: pending.addedBy || 'Family',
+    note: pending.note || '',
+  });
+  // Remove from pending cache and Firestore
+  delete pendingChoresCache[kidId][choreId];
+  try { await fbDeleteDoc(fbDoc(firebaseDb, 'public_chore_boards', token, 'pending', choreId)); } catch (e) { /* best-effort */ }
+  saveData(state);
+  render();
+};
+
+window.rejectPendingChore = async function(kidId, choreId) {
+  const token = (state.choreShares || {})[kidId];
+  if (!token) return;
+  if (pendingChoresCache[kidId]) delete pendingChoresCache[kidId][choreId];
+  try { await fbDeleteDoc(fbDoc(firebaseDb, 'public_chore_boards', token, 'pending', choreId)); } catch (e) { /* best-effort */ }
+  render();
 };
 
 window.openWishlistModal = function() {
