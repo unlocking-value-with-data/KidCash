@@ -23,6 +23,10 @@
 //     match /public_wishlists/{token} {
 //       allow read: if true;
 //       allow write, delete: if request.auth != null;
+//       // Claims subcollection — anyone with the link can mark an item as purchased
+//       match /claims/{itemId} {
+//         allow read, write, delete: if true;
+//       }
 //     }
 //   }
 // }

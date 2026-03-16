@@ -22,6 +22,7 @@
       --text-muted: #999AB0;
       --border: #E8E8F0;
       --green: #00B894;
+      --green-faint: #e8faf6;
       --radius: 20px;
       --radius-sm: 12px;
       --shadow: 0 4px 24px rgba(108,92,231,0.10);
@@ -42,153 +43,132 @@
       color: white;
     }
 
-    .header-logo {
-      font-size: 22px;
-      font-weight: 800;
-      letter-spacing: -0.5px;
-      opacity: 0.9;
-      margin-bottom: 20px;
-    }
+    .header-logo { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; opacity: 0.9; margin-bottom: 20px; }
 
     .header-avatar {
-      width: 72px;
-      height: 72px;
+      width: 72px; height: 72px;
       background: rgba(255,255,255,0.2);
       border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 36px;
-      margin: 0 auto 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 36px; margin: 0 auto 12px;
     }
 
-    .header-name {
-      font-size: 26px;
-      font-weight: 800;
-      letter-spacing: -0.5px;
-    }
+    .header-name { font-size: 26px; font-weight: 800; letter-spacing: -0.5px; }
+    .header-tagline { font-size: 15px; opacity: 0.85; margin-top: 6px; font-weight: 500; }
 
-    .header-tagline {
-      font-size: 15px;
-      opacity: 0.85;
-      margin-top: 6px;
-      font-weight: 500;
-    }
+    .content { max-width: 480px; margin: 0 auto; padding: 24px 16px 0; }
 
-    .content {
-      max-width: 480px;
-      margin: 0 auto;
-      padding: 24px 16px 0;
-    }
-
-    .items-list {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
+    .items-list { display: flex; flex-direction: column; gap: 12px; }
 
     .item-card {
       background: var(--bg-secondary);
       border-radius: var(--radius-sm);
       padding: 16px;
-      display: flex;
-      gap: 14px;
-      align-items: center;
       box-shadow: var(--shadow);
+      transition: opacity 0.2s;
     }
 
+    .item-card.claimed { opacity: 0.7; }
+
+    .item-top { display: flex; gap: 14px; align-items: center; }
+
     .item-image {
-      width: 72px;
-      height: 72px;
-      object-fit: cover;
-      border-radius: 10px;
-      flex-shrink: 0;
-      background: var(--bg);
+      width: 72px; height: 72px; object-fit: cover;
+      border-radius: 10px; flex-shrink: 0; background: var(--bg);
     }
 
     .item-image-placeholder {
-      width: 72px;
-      height: 72px;
-      border-radius: 10px;
-      flex-shrink: 0;
+      width: 72px; height: 72px; border-radius: 10px; flex-shrink: 0;
       background: linear-gradient(135deg, #f0eeff 0%, #e8e4ff 100%);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 28px;
+      display: flex; align-items: center; justify-content: center; font-size: 28px;
     }
 
-    .item-info {
-      flex: 1;
-      min-width: 0;
-    }
+    .item-info { flex: 1; min-width: 0; }
 
     .item-name {
-      font-size: 16px;
-      font-weight: 700;
-      letter-spacing: -0.2px;
-      margin-bottom: 4px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      font-size: 16px; font-weight: 700; letter-spacing: -0.2px; margin-bottom: 4px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
 
-    .item-price {
-      font-size: 18px;
-      font-weight: 800;
-      color: var(--purple);
-    }
+    .item-price { font-size: 18px; font-weight: 800; color: var(--purple); }
 
     .item-link {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      margin-top: 6px;
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--text-secondary);
-      text-decoration: none;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 3px 8px;
+      display: inline-flex; align-items: center; gap: 4px;
+      margin-top: 6px; font-size: 12px; font-weight: 600; color: var(--text-secondary);
+      text-decoration: none; border: 1px solid var(--border); border-radius: 6px; padding: 3px 8px;
     }
 
     .item-link:hover { background: var(--bg); }
 
-    .state-box {
-      text-align: center;
-      padding: 64px 24px;
+    .item-footer { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+
+    /* Claimed badge */
+    .claimed-badge {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
     }
 
-    .state-icon {
-      font-size: 56px;
-      margin-bottom: 16px;
+    .claimed-by {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 13px; font-weight: 600; color: var(--green);
     }
 
-    .state-title {
-      font-size: 20px;
-      font-weight: 700;
-      margin-bottom: 8px;
+    .claimed-by-icon {
+      width: 22px; height: 22px; border-radius: 50%;
+      background: var(--green-faint);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; flex-shrink: 0;
     }
 
-    .state-desc {
-      font-size: 14px;
-      color: var(--text-secondary);
-      line-height: 1.5;
+    .undo-btn {
+      background: none; border: none; color: var(--text-muted);
+      font-size: 12px; cursor: pointer; text-decoration: underline;
+      text-underline-offset: 2px; padding: 0; flex-shrink: 0;
     }
 
-    .footer {
-      text-align: center;
-      margin-top: 40px;
-      font-size: 12px;
-      color: var(--text-muted);
+    /* Claim button */
+    .claim-btn {
+      width: 100%; padding: 9px;
+      background: rgba(108,92,231,0.07);
+      border: 1.5px solid rgba(108,92,231,0.2);
+      border-radius: 8px; color: var(--purple);
+      font-size: 13px; font-weight: 700; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
     }
 
-    .footer a {
-      color: var(--purple);
-      text-decoration: none;
-      font-weight: 600;
+    .claim-btn:active { transform: scale(0.98); }
+
+    /* Claim form */
+    .claim-form { display: flex; gap: 8px; align-items: center; }
+
+    .claim-input {
+      flex: 1; padding: 9px 12px;
+      border: 1.5px solid var(--border); border-radius: 8px;
+      font-family: inherit; font-size: 14px; font-weight: 500;
+      outline: none; background: var(--bg);
     }
+
+    .claim-input:focus { border-color: var(--purple); }
+
+    .claim-confirm-btn {
+      padding: 9px 16px; border-radius: 8px; border: none;
+      background: var(--purple); color: white;
+      font-size: 13px; font-weight: 700; cursor: pointer; flex-shrink: 0;
+    }
+
+    .claim-cancel-btn {
+      padding: 9px 12px; border-radius: 8px;
+      border: 1px solid var(--border); background: none;
+      font-size: 13px; color: var(--text-secondary); cursor: pointer; flex-shrink: 0;
+    }
+
+    /* States */
+    .state-box { text-align: center; padding: 64px 24px; }
+    .state-icon { font-size: 56px; margin-bottom: 16px; }
+    .state-title { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+    .state-desc { font-size: 14px; color: var(--text-secondary); line-height: 1.5; }
+
+    .footer { text-align: center; margin-top: 40px; font-size: 12px; color: var(--text-muted); }
+    .footer a { color: var(--purple); text-decoration: none; font-weight: 600; }
   </style>
 </head>
 <body>
@@ -201,7 +181,8 @@
 
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js';
-    import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/11.4.0/firebase-firestore.js';
+    import { getFirestore, doc, getDoc, collection, getDocs, setDoc, deleteDoc }
+      from 'https://www.gstatic.com/firebasejs/11.4.0/firebase-firestore.js';
 
     const firebaseConfig = {
       apiKey: "AIzaSyCuUvL-bT4nB1J4B7qcpgIhXamzT85JPCY",
@@ -215,18 +196,23 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
+    // ── State ──────────────────────────────────────────────────
+    let wishlistData = null;
+    let claims = {}; // { [itemId]: { claimedBy, claimedAt } }
+    let claimingItemId = null;
+    let shareToken = null;
+
+    // ── Helpers ────────────────────────────────────────────────
     function formatMoney(cents) {
       const dollars = Math.floor(Math.abs(cents) / 100);
-      const remaining = Math.abs(cents) % 100;
-      return `$${dollars.toLocaleString()}.${remaining.toString().padStart(2, '0')}`;
+      const rem = Math.abs(cents) % 100;
+      return `$${dollars.toLocaleString()}.${rem.toString().padStart(2, '0')}`;
     }
 
-    function escapeHtml(str) {
+    function esc(str) {
       return String(str ?? '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
     function sanitizeUrl(url) {
@@ -238,10 +224,35 @@
       return null;
     }
 
-    function render(data) {
+    // ── Claim actions ──────────────────────────────────────────
+    window._startClaim = (itemId) => { claimingItemId = itemId; render(); setTimeout(() => document.getElementById('claimer-input')?.focus(), 50); };
+    window._cancelClaim = () => { claimingItemId = null; render(); };
+
+    window._submitClaim = async (itemId) => {
+      const input = document.getElementById('claimer-input');
+      const name = input?.value?.trim();
+      if (!name) { input?.classList.add('shake'); setTimeout(() => input?.classList.remove('shake'), 400); return; }
+      const claimRef = doc(db, 'public_wishlists', shareToken, 'claims', itemId);
+      await setDoc(claimRef, { claimedBy: name, claimedAt: Date.now() });
+      claims[itemId] = { claimedBy: name, claimedAt: Date.now() };
+      claimingItemId = null;
+      render();
+    };
+
+    window._unclaim = async (itemId) => {
+      const claimRef = doc(db, 'public_wishlists', shareToken, 'claims', itemId);
+      await deleteDoc(claimRef);
+      delete claims[itemId];
+      render();
+    };
+
+    window._handleClaimKeydown = (e, itemId) => { if (e.key === 'Enter') window._submitClaim(itemId); };
+
+    // ── Render ─────────────────────────────────────────────────
+    function render() {
       const root = document.getElementById('root');
 
-      if (!data) {
+      if (!wishlistData) {
         document.title = 'KidCash Wishlist';
         root.innerHTML = `
           <div class="header"><div class="header-logo">KidCash</div></div>
@@ -255,68 +266,113 @@
         return;
       }
 
-      const { kidName, items = [] } = data;
+      const { kidName, items = [] } = wishlistData;
       document.title = `${kidName}'s Wishlist · KidCash`;
 
       const itemsHtml = items.length === 0
         ? `<div class="state-box">
              <div class="state-icon">🌟</div>
              <div class="state-title">Nothing here yet</div>
-             <div class="state-desc">${escapeHtml(kidName)} hasn't added anything to their wishlist yet. Check back soon!</div>
+             <div class="state-desc">${esc(kidName)} hasn't added anything to their wishlist yet. Check back soon!</div>
            </div>`
-        : `<div class="items-list">
-             ${items.map(item => {
-               const productUrl = sanitizeUrl(item.url);
-               const imgHtml = item.image
-                 ? `<img class="item-image" src="${escapeHtml(item.image)}" alt="" onerror="this.outerHTML='<div class=\\'item-image-placeholder\\'>🎁</div>'">`
-                 : `<div class="item-image-placeholder">🎁</div>`;
-               const linkHtml = productUrl
-                 ? `<a class="item-link" href="${escapeHtml(productUrl)}" target="_blank" rel="noopener noreferrer">
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                      View product
-                    </a>`
-                 : '';
-               return `
-                 <div class="item-card">
-                   ${imgHtml}
-                   <div class="item-info">
-                     <div class="item-name">${escapeHtml(item.name)}</div>
-                     <div class="item-price">${formatMoney(item.price)}</div>
-                     ${linkHtml}
-                   </div>
-                 </div>`;
-             }).join('')}
-           </div>`;
+        : `<div class="items-list">${items.map(item => renderItem(item)).join('')}</div>`;
 
       root.innerHTML = `
         <div class="header">
           <div class="header-logo">KidCash</div>
           <div class="header-avatar">⭐</div>
-          <div class="header-name">${escapeHtml(kidName)}'s Wishlist</div>
-          <div class="header-tagline">Here's what ${escapeHtml(kidName)} is hoping for</div>
+          <div class="header-name">${esc(kidName)}'s Wishlist</div>
+          <div class="header-tagline">Here's what ${esc(kidName)} is hoping for</div>
         </div>
         <div class="content">
           ${itemsHtml}
-          <div class="footer">Powered by <a href="${escapeHtml(window.location.origin)}">KidCash</a></div>
+          <div class="footer">Powered by <a href="${esc(window.location.origin)}">KidCash</a></div>
         </div>`;
     }
 
+    function renderItem(item) {
+      const claim = claims[item.id];
+      const isClaiming = claimingItemId === item.id;
+      const productUrl = sanitizeUrl(item.url);
+
+      const imgHtml = item.image
+        ? `<img class="item-image" src="${esc(item.image)}" alt="" onerror="this.outerHTML='<div class=\\'item-image-placeholder\\'>🎁</div>'">`
+        : `<div class="item-image-placeholder">🎁</div>`;
+
+      const linkHtml = productUrl
+        ? `<a class="item-link" href="${esc(productUrl)}" target="_blank" rel="noopener noreferrer">
+             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+             View product
+           </a>`
+        : '';
+
+      let footerHtml = '';
+      if (claim) {
+        footerHtml = `
+          <div class="item-footer">
+            <div class="claimed-badge">
+              <div class="claimed-by">
+                <div class="claimed-by-icon">✓</div>
+                Purchased by ${esc(claim.claimedBy)}
+              </div>
+              <button class="undo-btn" onclick="_unclaim('${item.id}')">Undo</button>
+            </div>
+          </div>`;
+      } else if (isClaiming) {
+        footerHtml = `
+          <div class="item-footer">
+            <div class="claim-form">
+              <input class="claim-input" id="claimer-input" type="text" placeholder="Your name…"
+                onkeydown="_handleClaimKeydown(event, '${item.id}')">
+              <button class="claim-confirm-btn" onclick="_submitClaim('${item.id}')">Confirm</button>
+              <button class="claim-cancel-btn" onclick="_cancelClaim()">Cancel</button>
+            </div>
+          </div>`;
+      } else {
+        footerHtml = `
+          <div class="item-footer">
+            <button class="claim-btn" onclick="_startClaim('${item.id}')">
+              🎁 I'll buy this!
+            </button>
+          </div>`;
+      }
+
+      return `
+        <div class="item-card ${claim ? 'claimed' : ''}">
+          <div class="item-top">
+            ${imgHtml}
+            <div class="item-info">
+              <div class="item-name">${esc(item.name)}</div>
+              <div class="item-price">${formatMoney(item.price)}</div>
+              ${linkHtml}
+            </div>
+          </div>
+          ${footerHtml}
+        </div>`;
+    }
+
+    // ── Load data ──────────────────────────────────────────────
     async function main() {
       const params = new URLSearchParams(window.location.search);
-      const id = params.get('id');
+      shareToken = params.get('id');
 
-      if (!id || !/^[0-9a-f]{32}$/.test(id)) {
-        render(null);
-        return;
+      if (!shareToken || !/^[0-9a-f]{32}$/.test(shareToken)) {
+        render(); return;
       }
 
       try {
-        const snap = await getDoc(doc(db, 'public_wishlists', id));
-        render(snap.exists() ? snap.data() : null);
+        const [wishlistSnap, claimsSnap] = await Promise.all([
+          getDoc(doc(db, 'public_wishlists', shareToken)),
+          getDocs(collection(db, 'public_wishlists', shareToken, 'claims')),
+        ]);
+
+        if (wishlistSnap.exists()) wishlistData = wishlistSnap.data();
+        claimsSnap.forEach(d => { claims[d.id] = d.data(); });
       } catch (e) {
         console.error('Failed to load wishlist:', e);
-        render(null);
       }
+
+      render();
     }
 
     main();

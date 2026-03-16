@@ -2192,9 +2192,10 @@ function renderWishlistShareModal() {
         <div class="modal-handle"></div>
         <h2>Share Wishlist</h2>
         ${isShared ? `
-          <p class="share-modal-desc">Anyone with this link can see ${escapeHtml(kid.name)}'s wishlist — no login needed.</p>
+          <p class="share-modal-desc">Anyone with this link can see ${escapeHtml(kid.name)}'s wishlist and mark what they're buying — no login needed.</p>
           <div class="share-url-box">${escapeHtml(shareUrl)}</div>
           <button id="copyShareBtn" class="submit-btn" style="background:var(--purple)" onclick="copyShareLink('${escapeHtml(shareUrl)}')">Copy Link</button>
+          <a class="share-view-btn" href="${escapeHtml(shareUrl)}" target="_blank" rel="noopener noreferrer">See who's buying what →</a>
           <button class="share-stop-btn" onclick="revokeWishlistShare('${sanitizeId(kidId)}')">Stop Sharing</button>
         ` : `
           <p class="share-modal-desc">Create a shareable link so family and friends can see ${escapeHtml(kid.name)}'s wishlist. No login needed — perfect for birthdays and holidays!</p>
