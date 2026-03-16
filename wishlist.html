@@ -171,6 +171,63 @@
 
     .footer { text-align: center; margin-top: 40px; font-size: 12px; color: var(--text-muted); }
     .footer a { color: var(--purple); text-decoration: none; font-weight: 600; }
+
+    /* Contribution summary */
+    .contrib-summary { margin-bottom: 12px; }
+
+    .contrib-bar-wrap {
+      height: 6px; background: var(--bg-secondary);
+      border-radius: 99px; overflow: hidden; margin-bottom: 6px;
+    }
+
+    .contrib-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--purple) 0%, #a29bfe 100%);
+      border-radius: 99px; transition: width 0.4s ease;
+    }
+
+    .contrib-amount-label {
+      font-size: 12px; font-weight: 600; color: var(--purple); margin-bottom: 6px;
+    }
+
+    .contrib-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+
+    .contrib-chip {
+      font-size: 11px; font-weight: 500;
+      color: #5a4bd1; background: rgba(108,92,231,0.10);
+      border-radius: 99px; padding: 3px 9px;
+    }
+
+    /* Two-button action row */
+    .item-action-row { display: flex; gap: 8px; }
+
+    .item-action-row .claim-btn { flex: 1; }
+
+    .contrib-btn {
+      flex: 1; padding: 9px;
+      background: rgba(108,92,231,0.07);
+      border: 1.5px solid rgba(108,92,231,0.2);
+      border-radius: 8px; color: var(--purple);
+      font-size: 13px; font-weight: 700; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+    }
+
+    .contrib-btn:active { transform: scale(0.98); }
+
+    /* Contribution form */
+    .contrib-form { display: flex; flex-direction: column; gap: 8px; }
+
+    .contrib-amount-input { max-width: 130px; }
+
+    .contrib-form-row { display: flex; gap: 8px; align-items: center; }
+
+    .contrib-form-row .claim-input { flex: 1; }
+
+    .contrib-confirm-btn {
+      padding: 9px 16px; border-radius: 8px; border: none;
+      background: var(--purple); color: white;
+      font-size: 13px; font-weight: 700; cursor: pointer; flex-shrink: 0;
+    }
   </style>
 </head>
 <body>
@@ -183,7 +240,7 @@
 
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js';
-    import { getFirestore, doc, getDoc, collection, getDocs, setDoc, deleteDoc }
+    import { getFirestore, doc, getDoc, collection, getDocs, setDoc, deleteDoc, updateDoc, arrayUnion }
       from 'https://www.gstatic.com/firebasejs/11.4.0/firebase-firestore.js';
 
     const firebaseConfig = {
@@ -200,9 +257,14 @@
 
     // ── State ──────────────────────────────────────────────────
     let wishlistData = null;
-    let claims = {}; // { [itemId]: { claimedBy, claimedAt } }
+    let claims = {}; // { [itemId]: { claimedBy, claimedAt, contributions: [] } }
     let claimingItemId = null;
+    let contributingItemId = null;
     let shareToken = null;
+
+    function genId() {
+      return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    }
 
     // ── Helpers ────────────────────────────────────────────────
     function formatMoney(cents) {
@@ -227,8 +289,10 @@
     }
 
     // ── Claim actions ──────────────────────────────────────────
-    window._startClaim = (itemId) => { claimingItemId = itemId; render(); setTimeout(() => document.getElementById('claimer-input')?.focus(), 50); };
+    window._startClaim = (itemId) => { claimingItemId = itemId; contributingItemId = null; render(); setTimeout(() => document.getElementById('claimer-input')?.focus(), 50); };
     window._cancelClaim = () => { claimingItemId = null; render(); };
+    window._startContribute = (itemId) => { contributingItemId = itemId; claimingItemId = null; render(); setTimeout(() => document.getElementById('contrib-name-input')?.focus(), 50); };
+    window._cancelContribute = () => { contributingItemId = null; render(); };
 
     window._submitClaim = async (itemId) => {
       const input = document.getElementById('claimer-input');
@@ -266,7 +330,40 @@
       }
     };
 
+    window._submitContribution = async (itemId) => {
+      const nameInput = document.getElementById('contrib-name-input');
+      const amountInput = document.getElementById('contrib-amount-input');
+      const name = nameInput?.value?.trim();
+      const amountDollars = parseFloat(amountInput?.value);
+      if (!name) { nameInput?.classList.add('shake'); return; }
+      if (!amountDollars || amountDollars <= 0) { amountInput?.classList.add('shake'); return; }
+      const amountCents = Math.round(amountDollars * 100);
+      const contribution = { id: genId(), name, amount: amountCents, contributedAt: Date.now() };
+      const btn = document.querySelector('.contrib-confirm-btn');
+      if (btn) { btn.disabled = true; btn.textContent = '…'; }
+      try {
+        const claimRef = doc(db, 'public_wishlists', shareToken, 'claims', itemId);
+        await setDoc(claimRef, { contributions: arrayUnion(contribution) }, { merge: true });
+        if (!claims[itemId]) claims[itemId] = {};
+        if (!claims[itemId].contributions) claims[itemId].contributions = [];
+        claims[itemId].contributions.push(contribution);
+        contributingItemId = null;
+        render();
+      } catch (e) {
+        console.error('Failed to save contribution:', e);
+        if (btn) { btn.disabled = false; btn.textContent = 'Confirm'; }
+        const existing = document.querySelector('.claim-error');
+        if (!existing) {
+          const err = document.createElement('p');
+          err.className = 'claim-error';
+          err.textContent = 'Could not save. Please try again.';
+          document.querySelector('.contrib-form')?.after(err);
+        }
+      }
+    };
+
     window._handleClaimKeydown = (e, itemId) => { if (e.key === 'Enter') window._submitClaim(itemId); };
+    window._handleContribKeydown = (e, itemId) => { if (e.key === 'Enter') window._submitContribution(itemId); };
 
     // ── Render ─────────────────────────────────────────────────
     function render() {
@@ -312,7 +409,12 @@
 
     function renderItem(item) {
       const claim = claims[item.id];
+      const isClaimed = !!(claim?.claimedBy);
+      const contributions = claim?.contributions || [];
+      const totalContributed = contributions.reduce((sum, c) => sum + c.amount, 0);
+      const contribPercent = item.price > 0 ? Math.min(100, Math.round((totalContributed / item.price) * 100)) : 0;
       const isClaiming = claimingItemId === item.id;
+      const isContributing = contributingItemId === item.id;
       const productUrl = sanitizeUrl(item.url);
 
       const imgHtml = item.image
@@ -326,10 +428,22 @@
            </a>`
         : '';
 
+      const contribSummaryHtml = contributions.length > 0 ? `
+        <div class="contrib-summary">
+          <div class="contrib-bar-wrap">
+            <div class="contrib-bar-fill" style="width:${contribPercent}%"></div>
+          </div>
+          <div class="contrib-amount-label">${formatMoney(totalContributed)} of ${formatMoney(item.price)} contributed (${contribPercent}%)</div>
+          <div class="contrib-chips">
+            ${contributions.map(c => `<span class="contrib-chip">🎁 ${esc(c.name)} · ${formatMoney(c.amount)}</span>`).join('')}
+          </div>
+        </div>` : '';
+
       let footerHtml = '';
-      if (claim) {
+      if (isClaimed) {
         footerHtml = `
           <div class="item-footer">
+            ${contribSummaryHtml}
             <div class="claimed-badge">
               <div class="claimed-by">
                 <div class="claimed-by-icon">✓</div>
@@ -341,6 +455,7 @@
       } else if (isClaiming) {
         footerHtml = `
           <div class="item-footer">
+            ${contribSummaryHtml}
             <div class="claim-form">
               <input class="claim-input" id="claimer-input" type="text" placeholder="Your name…"
                 onkeydown="_handleClaimKeydown(event, '${item.id}')">
@@ -348,17 +463,33 @@
               <button class="claim-cancel-btn" onclick="_cancelClaim()">Cancel</button>
             </div>
           </div>`;
+      } else if (isContributing) {
+        footerHtml = `
+          <div class="item-footer">
+            ${contribSummaryHtml}
+            <div class="contrib-form">
+              <input class="claim-input" id="contrib-name-input" type="text" placeholder="Your name…"
+                onkeydown="_handleContribKeydown(event, '${item.id}')">
+              <input class="claim-input contrib-amount-input" id="contrib-amount-input" type="number"
+                placeholder="Amount ($)" min="1" step="1"
+                onkeydown="_handleContribKeydown(event, '${item.id}')">
+              <button class="contrib-confirm-btn" onclick="_submitContribution('${item.id}')">Confirm</button>
+              <button class="claim-cancel-btn" onclick="_cancelContribute()">Cancel</button>
+            </div>
+          </div>`;
       } else {
         footerHtml = `
           <div class="item-footer">
-            <button class="claim-btn" onclick="_startClaim('${item.id}')">
-              🎁 I'll buy this!
-            </button>
+            ${contribSummaryHtml}
+            <div class="item-action-row">
+              <button class="claim-btn" onclick="_startClaim('${item.id}')">🎁 I'll buy this!</button>
+              <button class="contrib-btn" onclick="_startContribute('${item.id}')">💰 Contribute</button>
+            </div>
           </div>`;
       }
 
       return `
-        <div class="item-card ${claim ? 'claimed' : ''}">
+        <div class="item-card ${isClaimed ? 'claimed' : ''}">
           <div class="item-top">
             ${imgHtml}
             <div class="item-info">

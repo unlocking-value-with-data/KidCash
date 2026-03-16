@@ -35,7 +35,7 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut, sendEmailVerification, sendPasswordResetEmail }
   from 'https://www.gstatic.com/firebasejs/11.4.0/firebase-auth.js';
-import { getFirestore, doc, getDoc, setDoc, deleteDoc, collection, getDocs }
+import { getFirestore, doc, getDoc, setDoc, deleteDoc, collection, getDocs, updateDoc, arrayUnion }
   from 'https://www.gstatic.com/firebasejs/11.4.0/firebase-firestore.js';
 
 const firebaseConfig = {
@@ -69,6 +69,8 @@ window.fbSetDoc = setDoc;
 window.fbDeleteDoc = deleteDoc;
 window.fbCollection = collection;
 window.fbGetDocs = getDocs;
+window.fbUpdateDoc = updateDoc;
+window.fbArrayUnion = arrayUnion;
 
 // Signal to app.js that Firebase is ready
 window.dispatchEvent(new Event('firebase-ready'));

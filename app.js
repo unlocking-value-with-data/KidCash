@@ -1885,24 +1885,40 @@ function renderSettingsPage() {
 }
 
 // ─── Reusable Card Components ────────────────────────────────
+function getGoalContributions(goal) {
+  if (!goal.wishlistItemId) return { total: 0, list: [] };
+  const kid = getActiveKid();
+  const claimDoc = (wishlistClaimsCache[kid?.id] || {})[goal.wishlistItemId];
+  const list = claimDoc?.contributions || [];
+  const total = list.reduce((sum, c) => sum + c.amount, 0);
+  return { total, list };
+}
+
 function renderGoalCard(goal, balance) {
   const tax = calcTax(goal.target, selectedState);
   const effectiveTarget = goal.target + tax;
-  const percent = effectiveTarget > 0 ? Math.min(100, Math.round((balance / effectiveTarget) * 100)) : 0;
+  const { total: contributed, list: contribList } = getGoalContributions(goal);
+  const totalProgress = balance + contributed;
+  const percent = effectiveTarget > 0 ? Math.min(100, Math.round((totalProgress / effectiveTarget) * 100)) : 0;
   const isComplete = percent >= 100;
-  const remaining = balance - effectiveTarget;
+  const remaining = totalProgress - effectiveTarget;
   return `
     <div class="goal-card">
       <div class="goal-card-inner">
         ${progressRing(percent, 60)}
         <div class="goal-card-text">
           <div class="goal-name">${escapeHtml(goal.name)}</div>
-          <div class="goal-amount">${formatMoney(balance)} / ${formatMoney(effectiveTarget)}</div>
+          <div class="goal-amount">${formatMoney(balance)} saved${contributed > 0 ? ` + ${formatMoney(contributed)} gifted` : ''} / ${formatMoney(effectiveTarget)}</div>
           ${tax > 0 ? `<div class="goal-tax-note">Includes ${formatMoney(tax)} tax (${STATE_TAX_RATES[selectedState]?.rate}%)</div>` : ''}
-          <div class="goal-percent">${isComplete ? '🎉 Goal reached!' : `${percent}% saved`}</div>
+          <div class="goal-percent">${isComplete ? '🎉 Goal reached!' : `${percent}% there`}</div>
           <div class="goal-balance-after ${remaining < 0 ? 'negative' : ''}">
             ${isComplete ? `${formatMoney(remaining)} left after buying` : `Need ${formatMoney(Math.abs(remaining))} more`}
           </div>
+          ${contribList.length > 0 ? `
+            <div class="goal-contrib-list">
+              ${contribList.map(c => `<span class="goal-contrib-chip">🎁 ${escapeHtml(c.name)} · ${formatMoney(c.amount)}</span>`).join('')}
+            </div>
+          ` : ''}
         </div>
       </div>
       <div class="goal-actions">
@@ -1936,13 +1952,30 @@ function renderWishlistCard(item, balance, claim) {
   const tax = calcTax(item.price, selectedState);
   const totalWithTax = item.price + tax;
   const remaining = (balance != null) ? balance - totalWithTax : null;
-  const isClaimed = !!claim;
+  const isClaimed = !!(claim?.claimedBy);
+  const contributions = claim?.contributions || [];
+  const totalContributed = contributions.reduce((sum, c) => sum + c.amount, 0);
+  const contribPercent = item.price > 0 ? Math.min(100, Math.round((totalContributed / item.price) * 100)) : 0;
+  const effectiveRemaining = remaining != null ? remaining + totalContributed : null;
+
   return `
-    <div class="wishlist-card ${isClaimed ? 'wishlist-card--claimed' : ''}">
+    <div class="wishlist-card ${isClaimed ? 'wishlist-card--claimed' : contributions.length > 0 ? 'wishlist-card--contributed' : ''}">
       ${isClaimed ? `
         <div class="wishlist-gift-banner">
           <span class="wishlist-gift-icon">🎁</span>
           <span><strong>${escapeHtml(claim.claimedBy)}</strong> is getting this for you!</span>
+        </div>
+      ` : contributions.length > 0 ? `
+        <div class="wishlist-contrib-section">
+          <div class="wishlist-contrib-bar-wrap">
+            <div class="wishlist-contrib-bar-fill" style="width:${contribPercent}%"></div>
+          </div>
+          <div class="wishlist-contrib-meta">
+            <span class="wishlist-contrib-total">${formatMoney(totalContributed)} of ${formatMoney(item.price)} contributed</span>
+          </div>
+          <div class="wishlist-contrib-chips">
+            ${contributions.map(c => `<span class="wishlist-contrib-chip">🎁 ${escapeHtml(c.name)} · ${formatMoney(c.amount)}</span>`).join('')}
+          </div>
         </div>
       ` : ''}
       <div class="wishlist-top">
@@ -1950,7 +1983,12 @@ function renderWishlistCard(item, balance, claim) {
         <div class="wishlist-info">
           <div class="wishlist-name">${escapeHtml(item.name)}</div>
           <div class="wishlist-price">${formatMoney(item.price)}${tax > 0 ? ` <span class="wishlist-price-withtax">~${formatMoney(totalWithTax)} with tax</span>` : ''}</div>
-          ${!isClaimed && remaining != null ? `<div class="wishlist-balance-after ${remaining < 0 ? 'negative' : ''}">${remaining >= 0 ? `${formatMoney(remaining)} left after` : `Need ${formatMoney(Math.abs(remaining))} more`}</div>` : ''}
+          ${!isClaimed && effectiveRemaining != null ? `
+            <div class="wishlist-balance-after ${effectiveRemaining < 0 ? 'negative' : ''}">
+              ${effectiveRemaining >= 0 ? `${formatMoney(effectiveRemaining)} left after` : `Need ${formatMoney(Math.abs(effectiveRemaining))} more`}
+              ${totalContributed > 0 ? `<span class="wishlist-contrib-note"> (incl. ${formatMoney(totalContributed)} contributed)</span>` : ''}
+            </div>
+          ` : ''}
           ${buildProductUrl(item.url) ? `<a class="wishlist-view-btn" href="${buildProductUrl(item.url)}" target="_blank" rel="noopener noreferrer">${svgIcon('<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>', 13)} View product</a>` : ''}
         </div>
       </div>
@@ -3013,6 +3051,7 @@ window.wishlistToGoal = function(id) {
     kidId: kid.id,
     name: item.name,
     target: item.price,
+    wishlistItemId: item.id, // link back for contribution tracking
   });
   // Remove from wishlist once promoted to a goal
   state.wishlist = state.wishlist.filter(w => w.id !== id);
