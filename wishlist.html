@@ -361,15 +361,18 @@
       }
 
       try {
-        const [wishlistSnap, claimsSnap] = await Promise.all([
-          getDoc(doc(db, 'public_wishlists', shareToken)),
-          getDocs(collection(db, 'public_wishlists', shareToken, 'claims')),
-        ]);
-
+        const wishlistSnap = await getDoc(doc(db, 'public_wishlists', shareToken));
         if (wishlistSnap.exists()) wishlistData = wishlistSnap.data();
-        claimsSnap.forEach(d => { claims[d.id] = d.data(); });
       } catch (e) {
         console.error('Failed to load wishlist:', e);
+      }
+
+      // Load claims separately — failure here won't break the page
+      try {
+        const claimsSnap = await getDocs(collection(db, 'public_wishlists', shareToken, 'claims'));
+        claimsSnap.forEach(d => { claims[d.id] = d.data(); });
+      } catch (e) {
+        console.warn('Claims unavailable (Firestore rules may need updating):', e);
       }
 
       render();
