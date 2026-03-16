@@ -2185,7 +2185,7 @@ function renderWishlistShareModal() {
   if (!kid) return '';
   const token = (state.wishlistShares || {})[kidId];
   const isShared = !!token;
-  const shareUrl = isShared ? `${window.location.origin}/wishlist.html?id=${token}` : '';
+  const shareUrl = isShared ? `${new URL('wishlist.html', window.location.href).href.split('?')[0]}?id=${token}` : '';
   return `
     <div class="modal-overlay open" onclick="handleOverlayClick(event)">
       <div class="modal">
