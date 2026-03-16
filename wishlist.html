@@ -167,6 +167,8 @@
     .state-title { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
     .state-desc { font-size: 14px; color: var(--text-secondary); line-height: 1.5; }
 
+    .claim-error { font-size: 12px; color: #e17055; margin-top: 6px; }
+
     .footer { text-align: center; margin-top: 40px; font-size: 12px; color: var(--text-muted); }
     .footer a { color: var(--purple); text-decoration: none; font-weight: 600; }
   </style>
@@ -232,18 +234,36 @@
       const input = document.getElementById('claimer-input');
       const name = input?.value?.trim();
       if (!name) { input?.classList.add('shake'); setTimeout(() => input?.classList.remove('shake'), 400); return; }
-      const claimRef = doc(db, 'public_wishlists', shareToken, 'claims', itemId);
-      await setDoc(claimRef, { claimedBy: name, claimedAt: Date.now() });
-      claims[itemId] = { claimedBy: name, claimedAt: Date.now() };
-      claimingItemId = null;
-      render();
+      const btn = document.querySelector('.claim-confirm-btn');
+      if (btn) { btn.disabled = true; btn.textContent = '…'; }
+      try {
+        const claimRef = doc(db, 'public_wishlists', shareToken, 'claims', itemId);
+        await setDoc(claimRef, { claimedBy: name, claimedAt: Date.now() });
+        claims[itemId] = { claimedBy: name, claimedAt: Date.now() };
+        claimingItemId = null;
+        render();
+      } catch (e) {
+        console.error('Failed to save claim:', e);
+        if (btn) { btn.disabled = false; btn.textContent = 'Confirm'; }
+        const existing = document.querySelector('.claim-error');
+        if (!existing) {
+          const err = document.createElement('p');
+          err.className = 'claim-error';
+          err.textContent = 'Could not save. Please try again shortly.';
+          document.querySelector('.claim-form')?.after(err);
+        }
+      }
     };
 
     window._unclaim = async (itemId) => {
-      const claimRef = doc(db, 'public_wishlists', shareToken, 'claims', itemId);
-      await deleteDoc(claimRef);
-      delete claims[itemId];
-      render();
+      try {
+        const claimRef = doc(db, 'public_wishlists', shareToken, 'claims', itemId);
+        await deleteDoc(claimRef);
+        delete claims[itemId];
+        render();
+      } catch (e) {
+        console.error('Failed to remove claim:', e);
+      }
     };
 
     window._handleClaimKeydown = (e, itemId) => { if (e.key === 'Enter') window._submitClaim(itemId); };
