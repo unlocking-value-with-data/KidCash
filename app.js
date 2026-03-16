@@ -15,6 +15,7 @@ function getDefaultData() {
     activeKidIndex: 0,
     wishlistShares: {}, // { [kidId]: shareToken }
     choreShares: {}, // { [kidId]: shareToken }
+    familyId: null,
   };
 }
 
@@ -29,6 +30,7 @@ function loadData() {
       if (!data.choreShares) data.choreShares = {};
       if (!data.chores) data.chores = [];
       if (!data.recurringActivities) data.recurringActivities = [];
+      if (data.familyId === undefined) data.familyId = null;
       // choreTemplates intentionally left as undefined/null — getChoreTemplates() handles defaults
       return data;
     }
@@ -81,6 +83,8 @@ async function writeToFirestore(uid, data) {
   if (data.paypalMe)    payload.paypalMe    = data.paypalMe;
   if (data.venmoHandle) payload.venmoHandle = data.venmoHandle;
   if (data.appleCash)   payload.appleCash   = data.appleCash;
+  if (data.familyId) payload.familyId = data.familyId;
+  if (data.role)     payload.role     = data.role;
   await fbSetDoc(docRef, payload);
 }
 
@@ -143,6 +147,7 @@ function scheduleSyncToFirestore() {
 
 // Flush in-memory state to Firestore
 async function flushToFirestore() {
+  if (contributorRole === 'contributor') return; // contributors never write parent data
   if (!currentUser || !window.fbSetDoc) return;
   clearTimeout(_syncTimer);
 
@@ -248,6 +253,16 @@ async function loadFromFirestore(uid) {
     // Cache locally and save a backup of this known-good Firestore state
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     localStorage.setItem(BACKUP_KEY, JSON.stringify(state));
+
+    // Detect contributor role
+    if (state.role === 'contributor' && state.familyId) {
+      contributorRole = 'contributor';
+      contributorFamilyId = state.familyId;
+      try { await loadContributorData(); } catch(e) { console.error('contributor load failed', e); }
+    } else if (state.familyId) {
+      ownerFamilyId = state.familyId;
+      try { await loadOwnerFamilyMembers(); } catch(e) { /* best-effort */ }
+    }
   } catch (e) {
     console.error('Firestore load failed, using local data:', e);
     state = loadData();
@@ -311,6 +326,14 @@ let wishlistShareClaims = null; // null=not loaded, {}=loading/empty, {itemId:{c
 let wishlistClaimsCache = {}; // { [kidId]: { [itemId]: claimData } | null } null=loading
 let pendingChoresCache = {}; // { [kidId]: null | { [choreId]: choreData } }
 let fetchStatus = null;
+let contributorRole = null;       // null | 'contributor'
+let contributorFamilyId = null;
+let contributorFamilyData = null; // { ownerId, name, ... }
+let contributorKids = [];
+let contributorWishlists = {};    // { [kidId]: { items, claims } }
+let contributorChores = {};       // { [kidId]: { token, pending: [{id,...}] } }
+let ownerFamilyId = null;         // set if this user owns a family
+let ownerFamilyMembers = [];      // [{ uid, displayName, email, joinedAt }]
 let fetchedProduct = { name: '', price: '', image: null };
 
 // ─── Auth State ──────────────────────────────────────────────
@@ -873,6 +896,11 @@ window.navigateTo = function(view) {
 // ─── Rendering ────────────────────────────────────────────────
 function render() {
   const app = document.getElementById('app');
+
+  if (contributorRole === 'contributor') {
+    app.innerHTML = renderContributorShell();
+    return;
+  }
 
   // Auth loading state (initial check)
   if (!appReady) {
@@ -1799,7 +1827,9 @@ function renderChoresPage() {
   }
   const activeKidId = getActiveKid()?.id;
   const pendingFamily = activeKidId && pendingChoresCache[activeKidId]
-    ? Object.entries(pendingChoresCache[activeKidId]).map(([id, data]) => ({ id, ...data }))
+    ? Object.entries(pendingChoresCache[activeKidId])
+        .map(([id, data]) => ({ id, ...data }))
+        .filter(c => !c.status || c.status === 'pending')  // only show unreviewed
     : [];
 
   const pendingAll = allChores.filter(c => c.status === 'pending');
@@ -2020,6 +2050,35 @@ function renderSettingsPage() {
                maxlength="50" placeholder="+1 (555) 000-0000 or you@icloud.com"
                onchange="setAppleCash(this.value)">
       </div>
+    </div>
+
+    <div class="settings-section">
+      <label class="settings-section-label">Family Access</label>
+      ${!ownerFamilyId ? `
+        <p class="settings-about" style="margin-bottom:12px">
+          Invite grandparents, aunts, uncles, and other family to view wishlists and suggest chores — without sharing your account.
+        </p>
+        <button class="submit-btn" style="background:var(--purple);width:100%" onclick="createFamily()">Set Up Family Access</button>
+      ` : `
+        <p class="settings-about" style="margin-bottom:12px">
+          Share this invite link. Family members sign up for their own account and get a scoped view of the kids' wishlists and chore board.
+        </p>
+        <button id="copyInviteBtn" class="submit-btn" style="background:var(--purple);width:100%;margin-bottom:8px" onclick="generateFamilyInvite()">Copy Invite Link</button>
+        ${ownerFamilyMembers.length > 0 ? `
+          <div class="family-members-list">
+            <div class="family-members-label">${ownerFamilyMembers.length} member${ownerFamilyMembers.length === 1 ? '' : 's'}</div>
+            ${ownerFamilyMembers.map(m => `
+              <div class="family-member-row">
+                <div class="family-member-info">
+                  <div class="family-member-name">${escapeHtml(m.displayName || m.email)}</div>
+                  <div class="family-member-email">${escapeHtml(m.email)}</div>
+                </div>
+                <button class="family-member-remove" onclick="removeFamilyMember('${sanitizeId(m.uid)}')">Remove</button>
+              </div>
+            `).join('')}
+          </div>
+        ` : `<p class="settings-about">No members yet — share the invite link above.</p>`}
+      `}
     </div>
 
     <div class="settings-section">
@@ -3219,6 +3278,203 @@ window.copyChoreLink = function(url) {
   });
 };
 
+// ─── Family System ────────────────────────────────────────────
+
+async function loadOwnerFamilyMembers() {
+  if (!ownerFamilyId || !window.firebaseDb) return;
+  try {
+    const snap = await fbGetDocs(fbCollection(firebaseDb, 'families', ownerFamilyId, 'members'));
+    ownerFamilyMembers = [];
+    snap.forEach(d => ownerFamilyMembers.push(d.data()));
+  } catch(e) { ownerFamilyMembers = []; }
+}
+
+async function loadContributorData() {
+  if (!contributorFamilyId || !window.firebaseDb) return;
+  const famSnap = await fbGetDoc(fbDoc(firebaseDb, 'families', contributorFamilyId));
+  if (!famSnap.exists()) return;
+  contributorFamilyData = famSnap.data();
+  const ownerSnap = await fbGetDoc(fbDoc(firebaseDb, 'users', contributorFamilyData.ownerId));
+  if (!ownerSnap.exists()) return;
+  const ownerData = ownerSnap.data();
+  contributorKids = ownerData.kids || [];
+  await Promise.all(contributorKids.map(kid => loadContributorKidData(kid, ownerData)));
+}
+
+async function loadContributorKidData(kid, ownerData) {
+  const wishToken = (ownerData.wishlistShares || {})[kid.id];
+  const choreToken = (ownerData.choreShares || {})[kid.id];
+  if (wishToken) {
+    try {
+      const wSnap = await fbGetDoc(fbDoc(firebaseDb, 'public_wishlists', wishToken));
+      const items = wSnap.exists() ? (wSnap.data().items || []) : [];
+      const claimsSnap = await fbGetDocs(fbCollection(firebaseDb, 'public_wishlists', wishToken, 'claims'));
+      const claims = {};
+      claimsSnap.forEach(d => { claims[d.id] = d.data(); });
+      contributorWishlists[kid.id] = { token: wishToken, items, claims };
+    } catch(e) { contributorWishlists[kid.id] = { token: wishToken, items: [], claims: {} }; }
+  }
+  if (choreToken) {
+    try {
+      const pendSnap = await fbGetDocs(fbCollection(firebaseDb, 'public_chore_boards', choreToken, 'pending'));
+      const pending = [];
+      pendSnap.forEach(d => pending.push({ id: d.id, ...d.data() }));
+      contributorChores[kid.id] = { token: choreToken, pending };
+    } catch(e) { contributorChores[kid.id] = { token: choreToken, pending: [] }; }
+  }
+}
+
+window.refreshContributorView = async function() {
+  if (!contributorFamilyId) return;
+  contributorWishlists = {}; contributorChores = {};
+  try { await loadContributorData(); } catch(e) {}
+  render();
+};
+
+window.createFamily = async function() {
+  if (!currentUser || ownerFamilyId) return;
+  const fid = generateId();
+  await fbSetDoc(fbDoc(firebaseDb, 'families', fid), {
+    ownerId: currentUser.uid,
+    name: '',
+    createdAt: Date.now(),
+  });
+  ownerFamilyId = fid;
+  state.familyId = fid;
+  saveData(state);
+  render();
+};
+
+window.generateFamilyInvite = async function() {
+  if (!ownerFamilyId || !currentUser) return;
+  const token = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+    .map(b => b.toString(16).padStart(2, '0')).join('');
+  await fbSetDoc(fbDoc(firebaseDb, 'family_invites', token), {
+    familyId: ownerFamilyId,
+    createdBy: currentUser.uid,
+    createdAt: Date.now(),
+    expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
+  });
+  const url = new URL('join.html', window.location.href).href.split('?')[0] + '?invite=' + token;
+  navigator.clipboard.writeText(url).then(() => {
+    const btn = document.getElementById('copyInviteBtn');
+    if (btn) { btn.textContent = '✓ Copied!'; setTimeout(() => { btn.textContent = 'Copy Invite Link'; }, 3000); }
+  });
+};
+
+window.removeFamilyMember = async function(memberUid) {
+  if (!ownerFamilyId) return;
+  try {
+    await fbDeleteDoc(fbDoc(firebaseDb, 'families', ownerFamilyId, 'members', memberUid));
+    ownerFamilyMembers = ownerFamilyMembers.filter(m => m.uid !== memberUid);
+    render();
+  } catch(e) { console.error('Failed to remove member', e); }
+};
+
+function renderContributorShell() {
+  const familyName = contributorFamilyData?.name || 'Family';
+  const kidsHtml = contributorKids.length === 0
+    ? `<div class="empty-state"><p>No kids set up yet. Check back soon!</p></div>`
+    : contributorKids.map(kid => renderContributorKidSection(kid)).join('');
+
+  return `
+    <div class="contributor-header">
+      <div class="contributor-header-top">
+        <div class="contributor-logo">KidCash</div>
+        <div class="contributor-family-badge">Family View</div>
+      </div>
+      <div class="contributor-family-name">${escapeHtml(familyName)}</div>
+      <div class="contributor-actions">
+        <button class="contributor-refresh-btn" onclick="refreshContributorView()">↻ Refresh</button>
+        <button class="contributor-signout-btn" onclick="handleSignOut()">Sign Out</button>
+      </div>
+    </div>
+    <div class="contributor-content">
+      ${kidsHtml}
+    </div>
+  `;
+}
+
+function renderContributorKidSection(kid) {
+  const wishData = contributorWishlists[kid.id];
+  const choreData = contributorChores[kid.id];
+
+  const wishHtml = !wishData
+    ? `<p class="contributor-empty">Wishlist not shared yet.</p>`
+    : wishData.items.length === 0
+    ? `<p class="contributor-empty">Nothing on the wishlist yet.</p>`
+    : wishData.items.map(item => {
+        const claim = wishData.claims[item.id];
+        const isClaimed = !!(claim?.claimedBy);
+        const contributions = claim?.contributions || [];
+        const totalContrib = contributions.reduce((s,c) => s + c.amount, 0);
+        const pct = item.price > 0 ? Math.min(100, Math.round(totalContrib / item.price * 100)) : 0;
+        return `
+          <div class="contributor-wish-card ${isClaimed ? 'is-claimed' : ''}">
+            ${item.image ? `<img class="contributor-wish-img" src="${escapeHtml(item.image)}" alt="" onerror="this.style.display='none'">` : ''}
+            <div class="contributor-wish-info">
+              <div class="contributor-wish-name">${escapeHtml(item.name)}</div>
+              <div class="contributor-wish-price">${formatMoney(item.price)}</div>
+              ${isClaimed ? `<div class="contributor-claimed-badge">🎁 ${escapeHtml(claim.claimedBy)} is buying this</div>` : ''}
+              ${totalContrib > 0 ? `
+                <div class="contributor-contrib-bar-wrap"><div class="contributor-contrib-bar" style="width:${pct}%"></div></div>
+                <div class="contributor-contrib-label">${formatMoney(totalContrib)} contributed</div>
+              ` : ''}
+            </div>
+          </div>`;
+      }).join('');
+
+  const choreItems = !choreData ? [] : choreData.pending;
+  const choreHtml = choreItems.length === 0
+    ? `<p class="contributor-empty">No suggestions yet. Be the first!</p>`
+    : choreItems.map(c => {
+        const status = c.status || 'pending';
+        const statusMap = {
+          pending:  { label: 'Awaiting review', cls: 'status-pending' },
+          approved: { label: 'Approved ✓',      cls: 'status-approved' },
+          rejected: { label: 'Not added',        cls: 'status-rejected' },
+        };
+        const s = statusMap[status] || statusMap.pending;
+        return `
+          <div class="contributor-chore-card">
+            <div class="contributor-chore-info">
+              <div class="contributor-chore-name">${escapeHtml(c.name)}</div>
+              <div class="contributor-chore-meta">+${formatMoney(c.amount)} · from ${escapeHtml(c.addedBy || 'you')}</div>
+              ${c.note ? `<div class="contributor-chore-note">"${escapeHtml(c.note)}"</div>` : ''}
+            </div>
+            <span class="contributor-status-badge ${s.cls}">${s.label}</span>
+          </div>`;
+      }).join('');
+
+  const choreToken = choreData?.token;
+  const choreBoardUrl = choreToken
+    ? new URL('choreboard.html', window.location.href).href.split('?')[0] + '?id=' + choreToken
+    : null;
+
+  return `
+    <div class="contributor-kid-section">
+      <div class="contributor-kid-header">
+        <div class="contributor-kid-avatar">${escapeHtml(kid.name.charAt(0).toUpperCase())}</div>
+        <div class="contributor-kid-name">${escapeHtml(kid.name)}</div>
+      </div>
+
+      <div class="contributor-block">
+        <div class="contributor-block-title">🎁 Wishlist</div>
+        ${wishHtml}
+      </div>
+
+      <div class="contributor-block">
+        <div class="contributor-block-title">🧹 Chore Suggestions</div>
+        ${choreHtml}
+        ${choreBoardUrl ? `
+          <a class="contributor-suggest-btn" href="${escapeHtml(choreBoardUrl)}" target="_blank" rel="noopener noreferrer">
+            + Suggest a Chore
+          </a>` : ''}
+      </div>
+    </div>
+  `;
+}
+
 async function loadPendingChoresForKid(kidId, token) {
   try {
     const snap = await fbGetDocs(fbCollection(firebaseDb, 'public_chore_boards', token, 'pending'));
@@ -3256,9 +3512,15 @@ window.approvePendingChore = async function(kidId, choreId) {
     addedBy: pending.addedBy || 'Family',
     note: pending.note || '',
   });
-  // Remove from pending cache and Firestore
-  delete pendingChoresCache[kidId][choreId];
-  try { await fbDeleteDoc(fbDoc(firebaseDb, 'public_chore_boards', token, 'pending', choreId)); } catch (e) { /* best-effort */ }
+  // Update status in Firestore and local cache
+  try {
+    await fbUpdateDoc(fbDoc(firebaseDb, 'public_chore_boards', token, 'pending', choreId), {
+      status: 'approved', reviewedAt: Date.now()
+    });
+  } catch(e) { /* best-effort */ }
+  if (pendingChoresCache[kidId]) {
+    pendingChoresCache[kidId][choreId] = { ...(pendingChoresCache[kidId][choreId] || {}), status: 'approved' };
+  }
   saveData(state);
   render();
 };
@@ -3266,8 +3528,14 @@ window.approvePendingChore = async function(kidId, choreId) {
 window.rejectPendingChore = async function(kidId, choreId) {
   const token = (state.choreShares || {})[kidId];
   if (!token) return;
-  if (pendingChoresCache[kidId]) delete pendingChoresCache[kidId][choreId];
-  try { await fbDeleteDoc(fbDoc(firebaseDb, 'public_chore_boards', token, 'pending', choreId)); } catch (e) { /* best-effort */ }
+  try {
+    await fbUpdateDoc(fbDoc(firebaseDb, 'public_chore_boards', token, 'pending', choreId), {
+      status: 'rejected', reviewedAt: Date.now()
+    });
+  } catch(e) { /* best-effort */ }
+  if (pendingChoresCache[kidId]) {
+    pendingChoresCache[kidId][choreId] = { ...(pendingChoresCache[kidId][choreId] || {}), status: 'rejected' };
+  }
   render();
 };
 
@@ -3774,6 +4042,10 @@ window.handleSignOut = async function() {
     kidModePinEntry = '';
     kidModePinError = '';
     showParentUnlockModal = false;
+    // Clear contributor/family state
+    contributorRole = null; contributorFamilyId = null; contributorFamilyData = null;
+    contributorKids = []; contributorWishlists = {}; contributorChores = {};
+    ownerFamilyId = null; ownerFamilyMembers = [];
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem('kidcash_state');
     localStorage.removeItem('kidcash_kidmode');

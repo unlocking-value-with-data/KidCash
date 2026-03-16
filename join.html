@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#6C5CE7">
+  <title>Join Family · KidCash</title>
+  <link rel="icon" href="icons/icon-192.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --purple: #6C5CE7; --purple-light: #A29BFE; --purple-dark: #5A4BD1;
+      --green: #00A878; --green-faint: rgba(0,168,120,0.10);
+      --red: #D63031;
+      --bg: #F5F6FA; --bg-secondary: #ECEDF3; --card: #FFFFFF;
+      --text: #1A1D2E; --text-secondary: #6B7280; --text-muted: #9CA3AF;
+      --border: #E5E7EB;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+      --shadow-md: 0 4px 16px rgba(0,0,0,0.09);
+      --radius: 16px; --radius-sm: 12px; --radius-xs: 8px;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 0 0 56px;
+    }
+
+    .header {
+      background: linear-gradient(135deg, var(--purple) 0%, var(--purple-light) 100%);
+      padding: 48px 24px 32px;
+      text-align: center;
+      color: white;
+    }
+
+    .header-logo {
+      font-size: 22px; font-weight: 800; letter-spacing: -0.5px;
+      opacity: 0.9; margin-bottom: 20px;
+    }
+
+    .header-icon {
+      width: 72px; height: 72px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 36px; margin: 0 auto 12px;
+    }
+
+    .header-title { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
+    .header-subtitle { font-size: 15px; opacity: 0.85; margin-top: 6px; font-weight: 500; }
+
+    .content { max-width: 480px; margin: 0 auto; padding: 24px 16px 0; }
+
+    .card {
+      background: var(--card);
+      border-radius: var(--radius-sm);
+      padding: 24px 20px;
+      box-shadow: var(--shadow-md);
+      margin-bottom: 24px;
+    }
+
+    .card-title {
+      font-size: 16px; font-weight: 700; margin-bottom: 16px;
+      color: var(--text);
+    }
+
+    .form-group { margin-bottom: 14px; }
+
+    .form-group label {
+      display: block; font-size: 13px; font-weight: 600;
+      color: var(--text-secondary); margin-bottom: 6px;
+    }
+
+    .form-input {
+      width: 100%; padding: 11px 14px;
+      border: 1.5px solid var(--border); border-radius: var(--radius-xs);
+      font-family: inherit; font-size: 15px; font-weight: 500;
+      outline: none; background: var(--bg);
+      color: var(--text); transition: border-color 0.15s;
+    }
+
+    .form-input:focus { border-color: var(--purple); }
+    .form-input.error { border-color: var(--red); }
+
+    .submit-btn {
+      width: 100%; padding: 14px;
+      background: var(--purple); color: white;
+      border: none; border-radius: var(--radius-xs);
+      font-family: inherit; font-size: 15px; font-weight: 700;
+      cursor: pointer; margin-top: 4px;
+      transition: background 0.15s, transform 0.1s;
+    }
+
+    .submit-btn:hover { background: var(--purple-dark); }
+    .submit-btn:active { transform: scale(0.98); }
+    .submit-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+    .toggle-link {
+      text-align: center; margin-top: 14px;
+      font-size: 13px; color: var(--text-muted);
+    }
+
+    .toggle-link button {
+      background: none; border: none; color: var(--purple);
+      font-weight: 700; font-size: 13px; cursor: pointer; padding: 0;
+    }
+
+    .error-msg {
+      font-size: 13px; color: var(--red); margin-top: 8px;
+      padding: 10px 12px; background: rgba(214,48,49,0.07);
+      border-radius: var(--radius-xs); display: none;
+    }
+
+    .error-msg.visible { display: block; }
+
+    .state-box { text-align: center; padding: 64px 24px; }
+    .state-icon { font-size: 56px; margin-bottom: 16px; }
+    .state-title { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+    .state-desc { font-size: 14px; color: var(--text-secondary); line-height: 1.5; }
+
+    .success-card {
+      background: var(--card);
+      border-radius: var(--radius-sm);
+      padding: 32px 20px;
+      box-shadow: var(--shadow-md);
+      text-align: center;
+    }
+
+    .success-icon { font-size: 48px; margin-bottom: 12px; }
+    .success-title { font-size: 20px; font-weight: 800; margin-bottom: 8px; color: var(--green); }
+    .success-desc { font-size: 14px; color: var(--text-secondary); line-height: 1.5; }
+
+    .family-invite-banner {
+      background: rgba(108,92,231,0.08);
+      border: 1.5px solid rgba(108,92,231,0.15);
+      border-radius: var(--radius-xs);
+      padding: 12px 14px;
+      margin-bottom: 16px;
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .family-name {
+      font-size: 17px; font-weight: 800; color: var(--purple);
+    }
+
+    .footer { text-align: center; margin-top: 40px; font-size: 12px; color: var(--text-muted); }
+    .footer a { color: var(--purple); text-decoration: none; font-weight: 600; }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-5px); }
+      40%, 80% { transform: translateX(5px); }
+    }
+    .shake { animation: shake 0.4s ease; }
+  </style>
+</head>
+<body>
+  <div id="root">
+    <div class="state-box">
+      <div class="state-icon">⏳</div>
+      <div class="state-title">Loading…</div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js';
+    import { getFirestore, doc, getDoc, setDoc }
+      from 'https://www.gstatic.com/firebasejs/11.4.0/firebase-firestore.js';
+    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged }
+      from 'https://www.gstatic.com/firebasejs/11.4.0/firebase-auth.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCuUvL-bT4nB1J4B7qcpgIhXamzT85JPCY",
+      authDomain: "kidcash-52084.firebaseapp.com",
+      projectId: "kidcash-52084",
+      storageBucket: "kidcash-52084.firebasestorage.app",
+      messagingSenderId: "505786658885",
+      appId: "1:505786658885:web:e5b514ffb8d410f37eb32c"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    // ── State ──────────────────────────────────────────────────
+    let inviteToken = null;
+    let inviteData = null;   // { familyId, createdBy, expiresAt }
+    let familyData = null;   // { ownerId, name }
+    let mode = 'signup';     // 'signup' | 'signin'
+    let busy = false;
+
+    // ── Helpers ────────────────────────────────────────────────
+    function esc(str) {
+      const d = document.createElement('div');
+      d.textContent = str ?? '';
+      return d.innerHTML;
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('errorMsg');
+      if (el) { el.textContent = msg; el.classList.add('visible'); }
+    }
+
+    function hideError() {
+      const el = document.getElementById('errorMsg');
+      if (el) el.classList.remove('visible');
+    }
+
+    function friendlyError(code) {
+      switch (code) {
+        case 'auth/email-already-in-use': return 'An account with this email already exists. Try signing in instead.';
+        case 'auth/invalid-email': return 'Please enter a valid email address.';
+        case 'auth/user-not-found': return 'No account found with this email.';
+        case 'auth/wrong-password': return 'Incorrect password.';
+        case 'auth/weak-password': return 'Password must be at least 6 characters.';
+        case 'auth/too-many-requests': return 'Too many attempts. Please try again later.';
+        case 'auth/invalid-credential': return 'Invalid email or password.';
+        default: return 'Something went wrong. Please try again.';
+      }
+    }
+
+    // ── Render ─────────────────────────────────────────────────
+    function render() {
+      const root = document.getElementById('root');
+
+      if (!inviteData || !familyData) {
+        root.innerHTML = `
+          <div class="header"><div class="header-logo">KidCash</div></div>
+          <div class="content">
+            <div class="state-box">
+              <div class="state-icon">🔗</div>
+              <div class="state-title">Invalid invite link</div>
+              <div class="state-desc">This invite link may have expired or been removed. Ask the family owner to send a new one.</div>
+            </div>
+            <div class="footer">Powered by <a href="${esc(window.location.origin)}">KidCash</a></div>
+          </div>`;
+        return;
+      }
+
+      const fName = esc(familyData.name || 'this family');
+      const isSignup = mode === 'signup';
+
+      root.innerHTML = `
+        <div class="header">
+          <div class="header-logo">KidCash</div>
+          <div class="header-icon">👨‍👩‍👧‍👦</div>
+          <div class="header-title">You're invited!</div>
+          <div class="header-subtitle">Join as a family contributor</div>
+        </div>
+        <div class="content">
+          <div class="card">
+            <div class="family-invite-banner">
+              You've been invited to join <span class="family-name">${fName}</span> on KidCash.
+              As a contributor, you can view wishlists and suggest chores for the kids.
+            </div>
+            <div class="card-title">${isSignup ? 'Create your account' : 'Sign in to your account'}</div>
+            ${isSignup ? `
+              <div class="form-group">
+                <label for="displayName">Your name <span style="color:var(--red)">*</span></label>
+                <input class="form-input" id="displayName" type="text" placeholder="e.g., Grandma Susan"
+                  maxlength="50" autocomplete="name">
+              </div>
+            ` : ''}
+            <div class="form-group">
+              <label for="emailInput">Email <span style="color:var(--red)">*</span></label>
+              <input class="form-input" id="emailInput" type="email" placeholder="you@example.com"
+                autocomplete="email" autocapitalize="off">
+            </div>
+            <div class="form-group">
+              <label for="passwordInput">Password <span style="color:var(--red)">*</span></label>
+              <input class="form-input" id="passwordInput" type="password"
+                placeholder="${isSignup ? 'Choose a password (6+ characters)' : 'Your password'}"
+                autocomplete="${isSignup ? 'new-password' : 'current-password'}">
+            </div>
+            <div class="error-msg" id="errorMsg"></div>
+            <button class="submit-btn" id="submitBtn" onclick="handleSubmit()">
+              ${isSignup ? 'Create Account & Join' : 'Sign In & Join'}
+            </button>
+            <div class="toggle-link">
+              ${isSignup
+                ? 'Already have an account? <button onclick="toggleMode()">Sign In instead</button>'
+                : 'Don\'t have an account? <button onclick="toggleMode()">Sign Up instead</button>'}
+            </div>
+          </div>
+          <div class="footer">Powered by <a href="${esc(window.location.origin)}">KidCash</a></div>
+        </div>
+      `;
+    }
+
+    // ── Auth & join flow ───────────────────────────────────────
+    window.toggleMode = function() {
+      mode = mode === 'signup' ? 'signin' : 'signup';
+      render();
+    };
+
+    window.handleSubmit = async function() {
+      if (busy) return;
+      hideError();
+
+      const email = document.getElementById('emailInput')?.value?.trim();
+      const password = document.getElementById('passwordInput')?.value;
+      const displayName = document.getElementById('displayName')?.value?.trim() || '';
+
+      if (!email) { showError('Please enter your email address.'); return; }
+      if (!password) { showError('Please enter your password.'); return; }
+      if (mode === 'signup' && !displayName) { showError('Please enter your name.'); return; }
+      if (mode === 'signup' && password.length < 6) { showError('Password must be at least 6 characters.'); return; }
+
+      busy = true;
+      const btn = document.getElementById('submitBtn');
+      if (btn) { btn.disabled = true; btn.textContent = 'Please wait…'; }
+
+      try {
+        let user;
+        if (mode === 'signup') {
+          const cred = await createUserWithEmailAndPassword(auth, email, password);
+          user = cred.user;
+        } else {
+          const cred = await signInWithEmailAndPassword(auth, email, password);
+          user = cred.user;
+        }
+
+        const now = Date.now();
+        const finalDisplayName = displayName || user.displayName || email.split('@')[0];
+
+        // Write contributor user doc
+        await setDoc(doc(db, 'users', user.uid), {
+          familyId: inviteData.familyId,
+          role: 'contributor',
+          joinedAt: now,
+        });
+
+        // Write to family members subcollection
+        await setDoc(doc(db, 'families', inviteData.familyId, 'members', user.uid), {
+          uid: user.uid,
+          email: user.email,
+          displayName: finalDisplayName.slice(0, 50),
+          role: 'contributor',
+          joinedAt: now,
+        });
+
+        // Redirect to main app
+        window.location.href = 'index.html';
+      } catch (e) {
+        busy = false;
+        if (btn) { btn.disabled = false; btn.textContent = mode === 'signup' ? 'Create Account & Join' : 'Sign In & Join'; }
+        showError(friendlyError(e.code));
+        console.error('Join error:', e);
+      }
+    };
+
+    // ── Load invite ────────────────────────────────────────────
+    async function main() {
+      const params = new URLSearchParams(window.location.search);
+      inviteToken = params.get('invite');
+
+      if (!inviteToken || !/^[0-9a-f]{32}$/.test(inviteToken)) {
+        render();
+        return;
+      }
+
+      try {
+        const inviteSnap = await getDoc(doc(db, 'family_invites', inviteToken));
+        if (!inviteSnap.exists()) {
+          render();
+          return;
+        }
+        const data = inviteSnap.data();
+        if (data.expiresAt <= Date.now()) {
+          // Expired
+          const root = document.getElementById('root');
+          root.innerHTML = `
+            <div class="header"><div class="header-logo">KidCash</div></div>
+            <div class="content">
+              <div class="state-box">
+                <div class="state-icon">⏰</div>
+                <div class="state-title">Invite link expired</div>
+                <div class="state-desc">This invite link has expired (links are valid for 30 days). Ask the family owner to send a new one.</div>
+              </div>
+              <div class="footer">Powered by <a href="${esc(window.location.origin)}">KidCash</a></div>
+            </div>`;
+          return;
+        }
+        inviteData = data;
+
+        // Load family data
+        const famSnap = await getDoc(doc(db, 'families', data.familyId));
+        if (famSnap.exists()) {
+          familyData = famSnap.data();
+        } else {
+          familyData = { name: 'Family' };
+        }
+      } catch (e) {
+        console.error('Failed to load invite:', e);
+        render();
+        return;
+      }
+
+      render();
+    }
+
+    main();
+  </script>
+</body>
+</html>

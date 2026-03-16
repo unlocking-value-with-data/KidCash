@@ -196,6 +196,11 @@
     .footer { text-align: center; margin-top: 40px; font-size: 12px; color: var(--text-muted); }
     .footer a { color: var(--purple); text-decoration: none; font-weight: 600; }
 
+    .cb-status-badge { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 99px; }
+    .cb-status-pending  { background: rgba(243,156,18,0.12); color: #b7760a; }
+    .cb-status-approved { background: rgba(0,168,120,0.12); color: #006b4d; }
+    .cb-status-rejected { background: rgba(214,48,49,0.10); color: #a82020; }
+
     @keyframes shake {
       0%, 100% { transform: translateX(0); }
       20%, 60% { transform: translateX(-5px); }
@@ -426,9 +431,18 @@
       `;
 
       const pendingOthers = pendingChores.filter(c => c.id !== submittedChoreId);
+      const statusBadge = (c) => {
+        const s = c.status || 'pending';
+        if (s === 'approved') return `<span class="cb-status-badge cb-status-approved">✓ Approved</span>`;
+        if (s === 'rejected') return `<span class="cb-status-badge cb-status-rejected">Not added this time</span>`;
+        return `<span class="cb-status-badge cb-status-pending">Awaiting review</span>`;
+      };
       const pendingListHtml = pendingOthers.length > 0 ? `
         <div class="pending-section">
-          <div class="pending-section-title">Already suggested</div>
+          <div class="pending-section-title" style="display:flex;align-items:center;justify-content:space-between">
+            <span>Already suggested</span>
+            <button onclick="main()" style="background:none;border:none;cursor:pointer;font-size:13px;font-weight:600;color:var(--purple)">↻ Refresh</button>
+          </div>
           <div class="pending-list">
             ${pendingOthers.map(c => `
               <div class="pending-card">
@@ -437,7 +451,10 @@
                   <div class="pending-card-name">${esc(c.name)}</div>
                   <div class="pending-card-meta">From ${esc(c.addedBy || 'Family')}${c.note ? ` · "${esc(c.note)}"` : ''}</div>
                 </div>
-                <div class="pending-card-amount">+${formatMoney(c.amount)}</div>
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
+                  <div class="pending-card-amount">+${formatMoney(c.amount)}</div>
+                  ${statusBadge(c)}
+                </div>
               </div>
             `).join('')}
           </div>

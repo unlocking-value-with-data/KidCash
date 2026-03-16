@@ -58,6 +58,33 @@
 //         allow delete: if true;
 //       }
 //     }
+//     // Family system
+//     match /family_invites/{token} {
+//       allow read: if true; // unauthenticated join.html needs to read
+//       allow create: if request.auth != null;
+//       allow delete: if request.auth != null;
+//     }
+//     match /families/{familyId} {
+//       allow read: if request.auth != null &&
+//         (resource.data.ownerId == request.auth.uid ||
+//          exists(/databases/$(database)/documents/families/$(familyId)/members/$(request.auth.uid)));
+//       allow create: if request.auth != null &&
+//         request.resource.data.ownerId == request.auth.uid;
+//       allow update, delete: if request.auth != null &&
+//         resource.data.ownerId == request.auth.uid;
+//       match /members/{memberId} {
+//         allow read: if request.auth != null &&
+//           (get(/databases/$(database)/documents/families/$(familyId)).data.ownerId == request.auth.uid ||
+//            request.auth.uid == memberId);
+//         allow create: if request.auth != null && request.auth.uid == memberId &&
+//           request.resource.data.role == 'contributor' &&
+//           request.resource.data.displayName is string &&
+//           request.resource.data.displayName.size() <= 50;
+//         allow delete: if request.auth != null &&
+//           (get(/databases/$(database)/documents/families/$(familyId)).data.ownerId == request.auth.uid ||
+//            request.auth.uid == memberId);
+//       }
+//     }
 //   }
 // }
 // ───────────────────────────────────────────────────────────────
