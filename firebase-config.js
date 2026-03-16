@@ -23,9 +23,21 @@
 //     match /public_wishlists/{token} {
 //       allow read: if true;
 //       allow write, delete: if request.auth != null;
-//       // Claims subcollection — anyone with the link can mark an item as purchased
+//       // Claims subcollection — anyone with the share link can claim/contribute.
+//       // Field validation prevents malformed data and caps contribution amounts.
 //       match /claims/{itemId} {
-//         allow read, write, delete: if true;
+//         allow read, delete: if true;
+//         allow create, update: if
+//           // claimedBy must be a short string if present
+//           (!request.resource.data.keys().hasAll(['claimedBy']) ||
+//            (request.resource.data.claimedBy is string &&
+//             request.resource.data.claimedBy.size() <= 50)) &&
+//           // claimedAt must be a number if present
+//           (!request.resource.data.keys().hasAll(['claimedAt']) ||
+//            request.resource.data.claimedAt is number) &&
+//           // contributions must be a list if present (individual amounts validated client-side)
+//           (!request.resource.data.keys().hasAll(['contributions']) ||
+//            request.resource.data.contributions is list);
 //       }
 //     }
 //   }

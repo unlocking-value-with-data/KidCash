@@ -296,7 +296,7 @@
 
     window._submitClaim = async (itemId) => {
       const input = document.getElementById('claimer-input');
-      const name = input?.value?.trim();
+      const name = input?.value?.trim().slice(0, 50);
       if (!name) { input?.classList.add('shake'); setTimeout(() => input?.classList.remove('shake'), 400); return; }
       const btn = document.querySelector('.claim-confirm-btn');
       if (btn) { btn.disabled = true; btn.textContent = '…'; }
@@ -333,10 +333,13 @@
     window._submitContribution = async (itemId) => {
       const nameInput = document.getElementById('contrib-name-input');
       const amountInput = document.getElementById('contrib-amount-input');
-      const name = nameInput?.value?.trim();
+      const name = nameInput?.value?.trim().slice(0, 50);
       const amountDollars = parseFloat(amountInput?.value);
       if (!name) { nameInput?.classList.add('shake'); return; }
-      if (!amountDollars || amountDollars <= 0) { amountInput?.classList.add('shake'); return; }
+      if (!amountDollars || amountDollars <= 0 || amountDollars > 10000) {
+        amountInput?.classList.add('shake');
+        return;
+      }
       const amountCents = Math.round(amountDollars * 100);
       const contribution = { id: genId(), name, amount: amountCents, contributedAt: Date.now() };
       const btn = document.querySelector('.contrib-confirm-btn');

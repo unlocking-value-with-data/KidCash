@@ -348,6 +348,42 @@ function getTotalExpenses(kidId) {
     .reduce((sum, t) => sum + t.amount, 0);
 }
 
+// ─── PIN Security ─────────────────────────────────────────────
+async function hashPin(pin, salt) {
+  const enc = new TextEncoder();
+  const buf = await crypto.subtle.digest('SHA-256', enc.encode(`kidcash:${salt}:${pin}`));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function isPinHash(str) {
+  return typeof str === 'string' && str.length === 64 && /^[0-9a-f]+$/.test(str);
+}
+
+function getPinLockout(key) {
+  try { return JSON.parse(localStorage.getItem(`kidcash_pin_lock_${key}`)) || { fails: 0, lockedUntil: 0 }; }
+  catch { return { fails: 0, lockedUntil: 0 }; }
+}
+
+function recordPinFail(key) {
+  const lock = getPinLockout(key);
+  lock.fails = (lock.fails || 0) + 1;
+  if (lock.fails >= 5) lock.lockedUntil = Date.now() + 5 * 60 * 1000;
+  localStorage.setItem(`kidcash_pin_lock_${key}`, JSON.stringify(lock));
+  return lock;
+}
+
+function clearPinFail(key) {
+  localStorage.removeItem(`kidcash_pin_lock_${key}`);
+}
+
+function isPinLocked(key) {
+  return getPinLockout(key).lockedUntil > Date.now();
+}
+
+function pinLockMinutes(key) {
+  return Math.max(1, Math.ceil((getPinLockout(key).lockedUntil - Date.now()) / 60000));
+}
+
 // ─── Formatting ───────────────────────────────────────────────
 function formatMoney(cents) {
   const abs = Math.abs(cents);
@@ -484,7 +520,8 @@ function parseMicrolinkResult(d, rule) {
     .replace(/^Amazon\.com:\s*/i, '')
     .replace(/\s*[-|:]\s*(Amazon|Walmart|Target|Best Buy|eBay|Etsy).*$/i, '')
     .replace(/\s*[-|:]\s*[A-Z][a-z]+\.(com|ca|co\.uk).*$/i, '')
-    .trim();
+    .trim()
+    .slice(0, 200); // clamp to prevent absurdly long titles from third-party APIs
 
   // Filter out generic site logos, marketing images, and favicons
   const isGenericImage = (url) => /\/marketing\/|\/prime|\/sprite|\/logo|\/brand|\/badge|Logos\/|favicon/i.test(url || '');
@@ -496,6 +533,8 @@ function parseMicrolinkResult(d, rule) {
     result.image = d.image.url;
   }
   // Don't fall back to logo — it's usually a favicon or site icon, not useful
+  // Validate image URL is https (no data: or javascript: sources from third-party APIs)
+  if (result.image && !/^https:\/\//i.test(result.image)) result.image = null;
 
   // Extract price from custom selector
   if (d.price && !/^\s*-?\d+%/.test(d.price)) {
@@ -922,7 +961,7 @@ function renderLoginScreen() {
 function renderPinLockScreen() {
   const kidsWithPins = state.kids
     .map((kid, i) => ({ ...kid, index: i }))
-    .filter(kid => kid.pin && kid.pin.length === 4);
+    .filter(kid => kid.pin && (isPinHash(kid.pin) || kid.pin.length === 4));
 
   if (kidsWithPins.length === 0) {
     // No kids have PINs — auto-disable Kid Mode
@@ -1819,11 +1858,10 @@ function renderSettingsPage() {
       ${state.kids.map((kid, i) => `
         <div class="settings-kid">
           <input type="text" value="${escapeHtml(kid.name)}" onchange="renameKid(${i}, this.value)" placeholder="Name">
-          <input type="text" class="settings-pin-input" value="${kid.pin || ''}"
+          <input type="password" class="settings-pin-input"
                  maxlength="4" inputmode="numeric" pattern="[0-9]*"
-                 placeholder="PIN"
-                 onchange="setKidPin(${i}, this.value)"
-                 onfocus="this.select()">
+                 placeholder="${isPinHash(kid.pin) ? '••••' : 'Set PIN'}"
+                 onchange="setKidPin(${i}, this.value)">
           ${state.kids.length > 1 ? `
             <button class="remove-kid" onclick="confirmRemoveKid(${i})">✕</button>
           ` : ''}
@@ -1840,14 +1878,10 @@ function renderSettingsPage() {
       <div class="form-group" style="margin-bottom:12px">
         <label>Parent PIN (to unlock full access)</label>
         <div class="pin-input-wrapper">
-          <input type="password" id="parentPinInput" class="settings-pin-input parent-pin" value="${state.parentPin || ''}"
+          <input type="password" id="parentPinInput" class="settings-pin-input parent-pin"
                  maxlength="4" inputmode="numeric" pattern="[0-9]*"
-                 placeholder="4-digit PIN"
-                 onchange="setParentPin(this.value)"
-                 onfocus="this.select()">
-          <button type="button" class="pin-toggle-vis" onclick="toggleParentPinVisibility()" title="Show/hide PIN">
-            <svg id="pinEyeIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-          </button>
+                 placeholder="${isPinHash(state.parentPin) ? '••••' : 'Set PIN'}"
+                 onchange="setParentPin(this.value)">
         </div>
       </div>
       <div class="settings-toggle-row">
@@ -3138,26 +3172,57 @@ window.enterPinDigit = function(digit) {
   if (kidModePinEntry.length >= 4) return;
   kidModePinEntry += digit;
   kidModePinError = '';
+  render();
+  if (kidModePinEntry.length === 4) verifyKidPin(kidModeSelectedKid, kidModePinEntry);
+};
 
-  if (kidModePinEntry.length === 4) {
-    const kid = state.kids[kidModeSelectedKid];
-    if (kid && kid.pin === kidModePinEntry) {
-      // Correct PIN — unlock for this kid
-      kidModeLocked = false;
-      kidModeKidIndex = kidModeSelectedKid;
-      state.activeKidIndex = kidModeSelectedKid;
-      currentView = 'home';
-      kidModePinEntry = '';
-      kidModePinError = '';
-      kidModeSelectedKid = null;
+async function verifyKidPin(kidIndex, entered) {
+  const kid = state.kids[kidIndex];
+  if (!kid) { kidModePinEntry = ''; render(); return; }
+
+  const lockKey = `kid_${kid.id}`;
+  if (isPinLocked(lockKey)) {
+    kidModePinEntry = '';
+    kidModePinError = `Too many attempts. Try again in ${pinLockMinutes(lockKey)} min.`;
+    render();
+    return;
+  }
+
+  const salt = (currentUser?.uid || '') + (kid.id || '');
+  let match = false;
+
+  if (isPinHash(kid.pin)) {
+    match = (await hashPin(entered, salt)) === kid.pin;
+  } else {
+    // Plaintext PIN — migrate to hash on success
+    match = kid.pin === entered;
+    if (match) {
+      kid.pin = await hashPin(entered, salt);
+      saveData(state);
+    }
+  }
+
+  if (match) {
+    clearPinFail(lockKey);
+    kidModeLocked = false;
+    kidModeKidIndex = kidIndex;
+    state.activeKidIndex = kidIndex;
+    currentView = 'home';
+    kidModePinEntry = '';
+    kidModePinError = '';
+    kidModeSelectedKid = null;
+  } else {
+    const lock = recordPinFail(lockKey);
+    kidModePinEntry = '';
+    if (isPinLocked(lockKey)) {
+      kidModePinError = `Too many attempts. Try again in ${pinLockMinutes(lockKey)} min.`;
     } else {
-      // Wrong PIN
-      kidModePinEntry = '';
-      kidModePinError = 'Wrong PIN. Try again.';
+      const left = 5 - lock.fails;
+      kidModePinError = `Wrong PIN.${left > 0 ? ` ${left} attempt${left === 1 ? '' : 's'} left.` : ''}`;
     }
   }
   render();
-};
+}
 
 window.deletePinDigit = function() {
   kidModePinEntry = kidModePinEntry.slice(0, -1);
@@ -3193,7 +3258,7 @@ window.cancelParentUnlock = function() {
   render();
 };
 
-window.attemptParentUnlock = function() {
+window.attemptParentUnlock = async function() {
   const pin = document.getElementById('parentUnlockPin')?.value;
   if (!pin) {
     parentUnlockError = 'Please enter the parent PIN.';
@@ -3205,8 +3270,30 @@ window.attemptParentUnlock = function() {
     render();
     return;
   }
-  if (pin === state.parentPin) {
-    // Correct — exit Kid Mode entirely
+
+  const lockKey = 'parent';
+  if (isPinLocked(lockKey)) {
+    parentUnlockError = `Too many attempts. Try again in ${pinLockMinutes(lockKey)} min.`;
+    render();
+    return;
+  }
+
+  const salt = currentUser?.uid || '';
+  let match = false;
+
+  if (isPinHash(state.parentPin)) {
+    match = (await hashPin(pin, salt)) === state.parentPin;
+  } else {
+    // Plaintext — migrate to hash on success
+    match = pin === state.parentPin;
+    if (match) {
+      state.parentPin = await hashPin(pin, salt);
+      saveData(state);
+    }
+  }
+
+  if (match) {
+    clearPinFail(lockKey);
     showParentUnlockModal = false;
     parentUnlockBusy = false;
     parentUnlockError = '';
@@ -3217,14 +3304,26 @@ window.attemptParentUnlock = function() {
     currentView = 'home';
     render();
   } else {
-    parentUnlockError = 'Incorrect PIN.';
+    const lock = recordPinFail(lockKey);
+    if (isPinLocked(lockKey)) {
+      parentUnlockError = `Too many attempts. Try again in ${pinLockMinutes(lockKey)} min.`;
+    } else {
+      const left = 5 - lock.fails;
+      parentUnlockError = `Incorrect PIN.${left > 0 ? ` ${left} attempt${left === 1 ? '' : 's'} left.` : ''}`;
+    }
     render();
   }
 };
 
-window.setKidPin = function(index, value) {
+window.setKidPin = async function(index, value) {
   const cleaned = value.replace(/\D/g, '').slice(0, 4);
-  state.kids[index].pin = cleaned.length === 4 ? cleaned : undefined;
+  if (cleaned.length === 4) {
+    const kid = state.kids[index];
+    const salt = (currentUser?.uid || '') + (kid?.id || '');
+    state.kids[index].pin = await hashPin(cleaned, salt);
+  } else {
+    state.kids[index].pin = undefined;
+  }
   saveData(state);
   render();
 };
@@ -3244,9 +3343,14 @@ window.toggleParentPinVisibility = function() {
   }
 };
 
-window.setParentPin = function(value) {
+window.setParentPin = async function(value) {
   const cleaned = value.replace(/\D/g, '').slice(0, 4);
-  state.parentPin = cleaned.length === 4 ? cleaned : undefined;
+  if (cleaned.length === 4) {
+    const salt = currentUser?.uid || '';
+    state.parentPin = await hashPin(cleaned, salt);
+  } else {
+    state.parentPin = undefined;
+  }
   saveData(state);
   render();
 };
@@ -3254,12 +3358,12 @@ window.setParentPin = function(value) {
 window.toggleKidMode = function() {
   if (!kidModeEnabled) {
     // Enabling — validate requirements
-    const kidsWithPins = state.kids.filter(k => k.pin && k.pin.length === 4);
+    const kidsWithPins = state.kids.filter(k => k.pin && (isPinHash(k.pin) || k.pin.length === 4));
     if (kidsWithPins.length === 0) {
       alert('Set a 4-digit PIN for at least one kid before enabling Kid Mode.');
       return;
     }
-    if (!state.parentPin || state.parentPin.length !== 4) {
+    if (!state.parentPin || !(isPinHash(state.parentPin) || state.parentPin.length === 4)) {
       alert('Set a 4-digit Parent PIN before enabling Kid Mode.');
       return;
     }
@@ -3436,7 +3540,8 @@ function sanitizeUrl(url) {
   if (!url) return '#';
   try {
     const parsed = new URL(url, 'https://placeholder.com');
-    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') return escapeHtml(url);
+    // Only allow http/https — blocks javascript:, data:, blob:, etc.
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') return parsed.href;
   } catch {}
   return '#';
 }
