@@ -568,6 +568,13 @@ function buildMicrolinkUrl(url) {
   return { apiUrl, rule };
 }
 
+// Extract Amazon ASIN from a URL and return a direct product image URL
+function amazonAsinImage(url) {
+  const m = url.match(/\/(?:dp|gp\/product|exec\/obidos\/ASIN)\/([A-Z0-9]{10})/i);
+  if (!m) return null;
+  return `https://images-na.ssl-images-amazon.com/images/P/${m[1]}.01._SX500_.jpg`;
+}
+
 // Parse a Microlink response into our result format
 function parseMicrolinkResult(d, rule) {
   const result = { name: '', price: '', image: null };
@@ -635,12 +642,16 @@ async function fetchViaMicrolink(url) {
       if (resp2.ok) {
         const json2 = await resp2.json();
         if (json2.status === 'success' && json2.data) {
-          return parseMicrolinkResult(json2.data, resolvedRule);
+          const r2 = parseMicrolinkResult(json2.data, resolvedRule);
+          if (!r2.image) r2.image = amazonAsinImage(resolvedUrl);
+          return r2;
         }
       }
     }
 
-    return parseMicrolinkResult(d, rule || resolvedRule);
+    const result = parseMicrolinkResult(d, rule || resolvedRule);
+    if (!result.image) result.image = amazonAsinImage(resolvedUrl || url);
+    return result;
   } catch (e) {
     console.warn('Microlink fetch failed:', e);
     return null;
